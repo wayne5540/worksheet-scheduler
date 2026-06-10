@@ -387,6 +387,7 @@ function App() {
           onGenerate={generateSchedule}
           onMonthChange={setMonth}
           onPrevFourWeekDateChange={setPrevFourWeekDate}
+          onRegenerate={generateSchedule}
           onScheduleChange={updateSchedule}
           onSetConstraints={updateMonthConstraints}
           onSetCycleCarryIn={setCycleCarryIn}
@@ -606,6 +607,7 @@ function RuleWorkspace({
               <th scope="col">Priority</th>
               <th scope="col">規則 ID</th>
               <th scope="col">規則名稱</th>
+              <th scope="col">說明</th>
               <th scope="col">順序</th>
               <th scope="col">啟用</th>
             </tr>
@@ -616,6 +618,12 @@ function RuleWorkspace({
                 <td>{rule.priority}</td>
                 <th scope="row">{rule.id}</th>
                 <td>{rule.name}</td>
+                <td>
+                  <details>
+                    <summary>{rule.id} 說明</summary>
+                    <p>{rule.description}</p>
+                  </details>
+                </td>
                 <td>
                   <div className="inlineActions">
                     <button
@@ -672,6 +680,7 @@ interface MonthlyWorkspaceProps {
   onGenerate: () => void | Promise<void>
   onMonthChange: (month: MonthString) => void
   onPrevFourWeekDateChange: (date: DateString) => void
+  onRegenerate: () => void | Promise<void>
   onScheduleChange: (schedule: MonthlySchedule) => void
   onSetConstraints: (constraints: PersonalConstraint[]) => void
   onSetCycleCarryIn: (cycleCarryIn: CycleCarryIn[]) => void
@@ -695,6 +704,7 @@ function MonthlyWorkspace({
   onGenerate,
   onMonthChange,
   onPrevFourWeekDateChange,
+  onRegenerate,
   onScheduleChange,
   onSetConstraints,
   onSetCycleCarryIn,
@@ -763,6 +773,7 @@ function MonthlyWorkspace({
           <StepFive
             activeRules={activeRules}
             employees={employees}
+            onRegenerate={onRegenerate}
             onScheduleChange={onScheduleChange}
             schedule={schedule}
           />
@@ -1066,11 +1077,13 @@ function StepFour({
 function StepFive({
   activeRules,
   employees,
+  onRegenerate,
   onScheduleChange,
   schedule,
 }: {
   activeRules: RuleDefinition[]
   employees: Employee[]
+  onRegenerate: () => void | Promise<void>
   onScheduleChange: (schedule: MonthlySchedule) => void
   schedule: MonthlySchedule
 }) {
@@ -1142,11 +1155,32 @@ function StepFive({
         <button onClick={validateSchedule} type="button">
           驗證
         </button>
-        <button type="button">重新產生</button>
+        <button onClick={() => void onRegenerate()} type="button">
+          重新產生
+        </button>
         <button onClick={() => void exportExcel()} type="button">
           匯出 Excel
         </button>
       </div>
+      {schedule.relaxedRules.length > 0 && (
+        <div
+          aria-label="已放寬規則"
+          className="validationSummary"
+          role="status"
+        >
+          <h3>已放寬規則</h3>
+          <ul>
+            {schedule.relaxedRules.map((relaxedRule, index) => (
+              <li key={`${relaxedRule.ruleId}-${index}`}>
+                {relaxedRule.ruleId} {relaxedRule.ruleName}：
+                {relaxedRule.affectedDates.length > 0
+                  ? relaxedRule.affectedDates.join('、')
+                  : '未提供日期'}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {violations.length > 0 && (
         <div aria-label="違規清單" className="validationSummary" role="status">
           <ul>

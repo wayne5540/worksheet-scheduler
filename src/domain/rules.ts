@@ -49,6 +49,7 @@ export interface RuleDefinition {
   id: RuleId
   name: string
   priority: number
+  description: string
   validate: (input: RuleValidationInput) => RuleViolation[]
 }
 
@@ -83,21 +84,81 @@ const WORK_SHIFTS = [
 ] as const satisfies readonly ShiftType[]
 
 export const DEFAULT_RULES: RuleDefinition[] = [
-  rule('R01', '指定休假', 1, validateR01),
-  rule('R02', '四周合規', 2, validateR02),
-  rule('R03', '主管班別覆蓋', 3, validateR03),
-  rule('R04', '主管不兼任', 4, validateR04),
-  rule('R05', '主管不同天全休', 5, validateR05),
-  rule('R06', '老手早班保障', 6, validateR06),
-  rule('R07', '老手不同天全休', 7, validateR07),
-  rule('R08', '平日人力', 8, validateR08),
-  rule('R09', '晚班隔天禁排早班', 9, validateR09),
-  rule('R10', '假日人力', 10, validateR10),
-  rule('R11', '店務日班別轉換', 11, validateR11),
-  rule('R12', '國定假日「國」分配', 12, validateR12),
-  rule('R13', '每週至少一個例假', 13, validateR13),
-  rule('R14', '不連續排超過五天', 14, validateR14),
-  rule('R15', '大清日人力', 15, validateR15),
+  rule('R01', '指定休假', 1, '指定休假日必須排入休假班別。', validateR01),
+  rule(
+    'R02',
+    '四周合規',
+    2,
+    '每個四週週期內，每位啟用員工至少有四個例假與四個休假。',
+    validateR02,
+  ),
+  rule(
+    'R03',
+    '主管班別覆蓋',
+    3,
+    '每天必須有一名主管早班與一名主管晚班。',
+    validateR03,
+  ),
+  rule('R04', '主管不兼任', 4, '主管早班與晚班不得由同一人兼任。', validateR04),
+  rule('R05', '主管不同天全休', 5, '同一天不得所有主管都休假。', validateR05),
+  rule('R06', '老手早班保障', 6, '每天早班至少需要一名老手。', validateR06),
+  rule('R07', '老手不同天全休', 7, '同一天不得所有老手都休假。', validateR07),
+  rule(
+    'R08',
+    '平日人力',
+    8,
+    '平日每天需恰好三名 F05 與四名 F13；店務日以 A 取代 F13。',
+    validateR08,
+  ),
+  rule(
+    'R09',
+    '晚班隔天禁排早班',
+    9,
+    '前一天為晚班者，隔天不得排早班，含月初跨月判斷。',
+    validateR09,
+  ),
+  rule(
+    'R10',
+    '假日人力',
+    10,
+    '假日每天需恰好三名國05與五名假日晚班。',
+    validateR10,
+  ),
+  rule(
+    'R11',
+    '店務日班別轉換',
+    11,
+    '店務日 F13 需轉為 A；假日店務日國13需轉為國A。',
+    validateR11,
+  ),
+  rule(
+    'R12',
+    '國定假日「國」分配',
+    12,
+    '假日班別必須使用國定假日班別，特與公不受此規則約束。',
+    validateR12,
+  ),
+  rule(
+    'R13',
+    '每週至少一個例假',
+    13,
+    '每個自然週內，每位啟用員工至少有一個例假。',
+    validateR13,
+  ),
+  rule(
+    'R14',
+    '不連續排超過五天',
+    14,
+    '每位員工連續上班天數不可超過五天。',
+    validateR14,
+  ),
+  rule(
+    'R15',
+    '大清日人力',
+    15,
+    '大清日至少八人上班，多餘人員優先安排晚班。',
+    validateR15,
+  ),
 ]
 
 export function validateRule(
@@ -124,9 +185,10 @@ function rule(
   id: RuleId,
   name: string,
   priority: number,
+  description: string,
   validate: RuleDefinition['validate'],
 ): RuleDefinition {
-  return { id, name, priority, validate }
+  return { id, name, priority, description, validate }
 }
 
 function validateR01(input: RuleValidationInput): RuleViolation[] {

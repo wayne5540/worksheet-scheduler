@@ -75,6 +75,8 @@ describe('App', () => {
     expect(screen.getByText('排班結果')).toBeInTheDocument()
     expect(screen.getByText('需求人力')).toBeInTheDocument()
     expect(screen.getByText('合格（A/B）')).toBeInTheDocument()
+    expect(screen.getByText('已放寬規則')).toBeInTheDocument()
+    expect(screen.getByText(/R15 大清日人力/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '匯出 Excel' })).toBeEnabled()
   })
 
@@ -99,6 +101,7 @@ describe('App', () => {
       screen.getByRole('button', { name: '還原預設順序' }),
     ).toBeInTheDocument()
     expect(screen.getByText('R01')).toBeInTheDocument()
+    expect(screen.getByText('指定休假日必須排入休假班別。')).toBeInTheDocument()
   })
 
   it('persists employee edits in localStorage', async () => {
@@ -292,6 +295,37 @@ describe('App', () => {
       'true',
     )
     expect(screen.getByText('R09 晚班隔天不得排早班')).toBeInTheDocument()
+  })
+
+  it('regenerates the current schedule and clears manual edits', async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await generateVisibleSchedule(user)
+
+    const firstShift = screen.getByLabelText(
+      '主管 2026-06-01 班別',
+    ) as HTMLSelectElement
+    const generatedShift = firstShift.value
+    const manualShift = generatedShift === '例' ? '休' : '例'
+
+    await user.selectOptions(
+      screen.getByLabelText('主管 2026-06-01 班別'),
+      manualShift,
+    )
+
+    expect(screen.getByLabelText('主管 2026-06-01 班別')).toHaveValue(
+      manualShift,
+    )
+
+    await user.click(screen.getByRole('button', { name: '重新產生' }))
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('主管 2026-06-01 班別')).toHaveValue(
+        generatedShift,
+      ),
+    )
   })
 
   it('downloads the generated schedule workbook from the export action', async () => {
