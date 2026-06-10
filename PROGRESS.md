@@ -25,14 +25,15 @@ Last updated: 2026-06-10
 - [x] Replaced seeded Step 1-3 monthly setup controls with editable carry-in, special-day, and personal-constraint records.
 - [x] Expanded Step 5 schedule review to a full-month table with PLAN summary rows.
 - [x] Added employee row ordering and rule priority reordering controls.
+- [x] Computed Step 1 carry-in automatically from saved previous-month schedules when available.
 
 ## In Progress
 
-- [ ] Compute Step 1 carry-in automatically from saved previous-month schedules when available.
+- [ ] Improve Excel styling/template fidelity against the supplied workbook format.
 
 ## Todo
 
-- [ ] Improve Excel styling/template fidelity against the supplied workbook format.
+- [ ] Confirm any remaining export polish against a real supplied workbook file when one is available.
 
 ## Learnings
 
@@ -59,3 +60,4 @@ Last updated: 2026-06-10
 - Step 1-3 setup is now month-driven: carry-in rows follow employees, special-day toggles cover every date with 店務/大清 mutual exclusion, and personal constraints are stored per employee for the active month.
 - Step 5 now renders the full month plus staffing summary rows; the summary logic mirrors the export counts closely enough for UI review, while export styling remains separate polish.
 - Employee and rule ordering use explicit up/down controls that persist through the existing localStorage-backed settings stores.
+- Step 1 carry-in automation reads the saved previous-month schedule from IndexedDB and counts only `例`/`休` entries from `prevFourWeekDate + 1` through the previous month end; manual rows remain the fallback when no prior schedule exists.

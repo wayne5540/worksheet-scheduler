@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
+import type { MonthlySchedule, ShiftType } from './domain/model'
+import { IndexedDbScheduleStore } from './persistence/persistence'
 
 describe('App', () => {
   beforeEach(() => {
@@ -235,6 +237,23 @@ describe('App', () => {
     expect(screen.getByText('老手 已設定 1 天')).toBeInTheDocument()
   })
 
+  it('loads Step 1 carry-in from a saved previous-month schedule', async () => {
+    const store = new IndexedDbScheduleStore()
+
+    await store.saveSchedule(makePreviousMonthSchedule())
+
+    render(<App />)
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('主管 上月例假結轉')).toHaveValue(2),
+    )
+    expect(screen.getByLabelText('主管 上月休假結轉')).toHaveValue(1)
+    expect(screen.getByLabelText('老手 上月例假結轉')).toHaveValue(1)
+    expect(screen.getByLabelText('老手 上月休假結轉')).toHaveValue(2)
+    expect(screen.getByLabelText('一般員工 上月例假結轉')).toHaveValue(0)
+    expect(screen.getByLabelText('一般員工 上月休假結轉')).toHaveValue(0)
+  })
+
   it('persists manual schedule cell edits in IndexedDB', async () => {
     const user = userEvent.setup()
     const { unmount } = render(<App />)
@@ -311,4 +330,38 @@ async function generateVisibleSchedule(
   await user.click(screen.getByRole('button', { name: '下一步' }))
   await user.click(screen.getByRole('button', { name: '產生班表' }))
   await screen.findByRole('heading', { name: 'Step 5：檢視 / 調整 / 匯出' })
+}
+
+function makePreviousMonthSchedule(): MonthlySchedule {
+  return {
+    month: '2026-05',
+    prevFourWeekDate: '2026-04-17',
+    cycleCarryIn: [],
+    specialDays: [],
+    constraints: [],
+    entries: [
+      makeEntry('emp-supervisor', '2026-05-16', '例'),
+      makeEntry('emp-supervisor', '2026-05-20', '例'),
+      makeEntry('emp-supervisor', '2026-05-21', '休'),
+      makeEntry('emp-veteran', '2026-05-18', '例'),
+      makeEntry('emp-veteran', '2026-05-19', '休'),
+      makeEntry('emp-veteran', '2026-05-31', '休'),
+      makeEntry('emp-regular', '2026-05-16', 'F05'),
+    ],
+    relaxedRules: [],
+  }
+}
+
+function makeEntry(
+  employeeId: string,
+  date: MonthlySchedule['entries'][number]['date'],
+  shift: ShiftType,
+): MonthlySchedule['entries'][number] {
+  return {
+    employeeId,
+    date,
+    shift,
+    isAutoRelaxed: false,
+    isManualEdit: false,
+  }
 }

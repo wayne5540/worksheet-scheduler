@@ -1,5 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
+import {
+  calculateCycleCarryInFromSchedule,
+  previousMonth,
+} from './domain/cycleCarryIn'
 import { calculateFourWeekNodes } from './domain/fourWeekCycle'
 import {
   SHIFT_TYPES,
@@ -112,6 +116,7 @@ function App() {
   const [generationMessage, setGenerationMessage] = useState<string | null>(
     null,
   )
+  const carryInSourceKey = useRef<string | null>(null)
 
   const fourWeekNodes = useMemo(
     () => calculateFourWeekNodes(month, prevFourWeekDate),
@@ -186,6 +191,59 @@ function App() {
       isCurrent = false
     }
   }, [month, scheduleStore])
+
+  useEffect(() => {
+    let isCurrent = true
+    const sourceKey = `${month}:${prevFourWeekDate}`
+
+    if (!requiresCarryIn(month, prevFourWeekDate)) {
+      queueMicrotask(() => {
+        if (!isCurrent) {
+          return
+        }
+
+        carryInSourceKey.current = sourceKey
+        setCycleCarryIn([])
+      })
+
+      return () => {
+        isCurrent = false
+      }
+    }
+
+    scheduleStore
+      .loadSchedule(previousMonth(month))
+      .then((previousSchedule) => {
+        if (!isCurrent) {
+          return
+        }
+
+        if (previousSchedule) {
+          setCycleCarryIn(
+            calculateCycleCarryInFromSchedule({
+              employees,
+              month,
+              prevFourWeekDate,
+              previousSchedule,
+            }),
+          )
+          carryInSourceKey.current = sourceKey
+          return
+        }
+
+        setCycleCarryIn((currentCarryIn) =>
+          normalizeCycleCarryIn(
+            carryInSourceKey.current === sourceKey ? currentCarryIn : [],
+            employees,
+          ),
+        )
+        carryInSourceKey.current = sourceKey
+      })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [employees, month, prevFourWeekDate, scheduleStore])
 
   function updateSchedule(nextSchedule: MonthlySchedule) {
     setSchedule(nextSchedule)
