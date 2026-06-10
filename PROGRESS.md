@@ -14,14 +14,15 @@ Last updated: 2026-06-10
 - [x] Added domain model tests and pure domain utilities for employees, shift types, special days, and four-week cycle calculations.
 - [x] Added R01-R15 rule validator tests and pure validation functions for existing monthly schedules.
 - [x] Added localStorage and IndexedDB persistence tests with minimal persistence adapters.
+- [x] Added Excel export structure tests and a minimal `.xlsx` workbook builder.
 
 ## In Progress
 
-- [ ] Add Excel export structure tests before export implementation.
+- [ ] Build the monthly scheduling UI workflow from `PLAN.md`.
 
 ## Todo
 
-- [ ] Build the monthly scheduling UI workflow from `PLAN.md`.
+No active todo items beyond the current UI workflow.
 
 ## Learnings
 
@@ -36,3 +37,5 @@ Last updated: 2026-06-10
 - Special day data allows holiday and four-week markers to overlap with store-meeting or deep-cleaning markers; only store-meeting and deep-cleaning are mutually exclusive.
 - Rule validators currently validate completed monthly schedules and report violations; they do not yet generate candidate schedules or perform relaxation/backtracking.
 - Persistence uses `localStorage` for employee/rule settings and IndexedDB `monthlySchedules` keyed by `month` for monthly schedules; tests use `fake-indexeddb`.
+- Excel export uses `write-excel-file`; npm `xlsx@0.18.5` was checked and avoided because `npm audit` reports high severity advisories without a fix.
+- Excel export currently builds the workbook structure and Blob; styling and pixel-perfect matching against the supplied template remain future UI/export polish.

@@ -550,7 +550,7 @@ App
 | 前端框架 | React（建議）或 Vue 3 |
 | 狀態管理 | Zustand / Pinia，或 React Context |
 | 資料持久化 | `localStorage`（設定）、`IndexedDB`（班表資料）|
-| Excel 匯出 | SheetJS（`xlsx` package）|
+| Excel 匯出 | `write-excel-file`（避免使用 npm `xlsx` 目前無修正版的 high severity advisories）|
 | 排班演算法 | Backtracking + Constraint Propagation；20 人以內效能可接受 |
 | 規則引擎 | 每條規則實作為獨立 validator function；relaxation loop 逐一移除並重試 |
 

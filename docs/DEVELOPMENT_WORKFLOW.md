@@ -26,6 +26,7 @@
 - Package manager: npm with `package-lock.json`
 - App stack: React `19.2.7`, Vite `8.0.16`, TypeScript `6.0.3`, Vitest `4.1.8`
 - IndexedDB tests: `fake-indexeddb` `6.2.5` as a dev-only browser API emulator
+- Excel export: `write-excel-file` `4.1.1`; npm `xlsx@0.18.5` was avoided because `npm audit` reported high severity advisories with no npm fix available
 
 ## TDD Loop
 
