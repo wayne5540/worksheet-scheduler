@@ -13,14 +13,14 @@ Last updated: 2026-06-10
 - [x] Scaffolded the first app shell without implementing business scheduling logic.
 - [x] Added domain model tests and pure domain utilities for employees, shift types, special days, and four-week cycle calculations.
 - [x] Added R01-R15 rule validator tests and pure validation functions for existing monthly schedules.
+- [x] Added localStorage and IndexedDB persistence tests with minimal persistence adapters.
 
 ## In Progress
 
-- [ ] Add IndexedDB/localStorage persistence tests before persistence implementation.
+- [ ] Add Excel export structure tests before export implementation.
 
 ## Todo
 
-- [ ] Add Excel export structure tests before export implementation.
 - [ ] Build the monthly scheduling UI workflow from `PLAN.md`.
 
 ## Learnings
@@ -35,3 +35,4 @@ Last updated: 2026-06-10
 - Pure date calculations use UTC `Date` values internally and expose `YYYY-MM-DD` strings at module boundaries to avoid local timezone drift in schedule rules.
 - Special day data allows holiday and four-week markers to overlap with store-meeting or deep-cleaning markers; only store-meeting and deep-cleaning are mutually exclusive.
 - Rule validators currently validate completed monthly schedules and report violations; they do not yet generate candidate schedules or perform relaxation/backtracking.
+- Persistence uses `localStorage` for employee/rule settings and IndexedDB `monthlySchedules` keyed by `month` for monthly schedules; tests use `fake-indexeddb`.
