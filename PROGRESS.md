@@ -19,15 +19,15 @@ Last updated: 2026-06-10
 - [x] Added a minimal deterministic attempt scheduler with prefill preservation, R09 pruning, and final validator checks.
 - [x] Added the first monthly scheduling UI workflow with stepper navigation, schedule generation, review table, and export action wiring.
 - [x] Wired employee and rule setting UI state to `localStorage` with editable employee rows and rule enable toggles.
+- [x] Persisted generated monthly schedules to IndexedDB and reload them by month in the UI.
 
 ## In Progress
 
-- [ ] Persist generated monthly schedules to IndexedDB and reload them by month.
+- [ ] Add manual schedule cell editing, violation highlighting, and saved export download flow.
 
 ## Todo
 
 - [ ] Expand attempt scheduler constraint propagation and performance coverage for realistic full-month R01-R15 staffing.
-- [ ] Add manual schedule cell editing, violation highlighting, and saved export download flow.
 - [ ] Replace remaining seeded monthly demo defaults with fully editable month setup records.
 
 ## Learnings
@@ -48,4 +48,5 @@ Last updated: 2026-06-10
 - Scheduling orchestration now owns prefill and rule relaxation; `attemptBacktrackingSchedule` provides the first injected search implementation.
 - The first attempt scheduler is intentionally small: it fills missing cells deterministically, prunes R09 late-to-early candidates, and relies on validators for final acceptance; it still needs stronger constraint propagation for realistic rosters.
 - The first UI workflow uses seeded employees and generates with the currently tractable R01/R09 rule subset so the stepper can exercise real scheduling/export plumbing without blocking on the full solver.
-- Employee and rule settings in the UI now use `LocalStorageSettingsStore`; monthly schedules still need IndexedDB wiring in the UI.
+- Employee and rule settings in the UI now use `LocalStorageSettingsStore`; generated monthly schedules use `IndexedDbScheduleStore`.
+- Generated schedules are saved through `IndexedDbScheduleStore` after successful generation; App reloads a saved month into Step 5 when available.

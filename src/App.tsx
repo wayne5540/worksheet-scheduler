@@ -17,6 +17,7 @@ import {
 } from './export/excel'
 import {
   defaultRuleSettings,
+  IndexedDbScheduleStore,
   LocalStorageSettingsStore,
   type RuleSetting,
 } from './persistence/persistence'
@@ -82,6 +83,7 @@ function App() {
     () => new LocalStorageSettingsStore(window.localStorage),
     [],
   )
+  const scheduleStore = useMemo(() => new IndexedDbScheduleStore(), [])
   const [activeTab, setActiveTab] = useState<NavItem>('月度排班')
   const [currentStep, setCurrentStep] = useState(1)
   const [employees, setEmployees] = useState<Employee[]>(() => {
@@ -148,7 +150,29 @@ function App() {
     settingsStore.saveRuleSettings(ruleSettings)
   }, [ruleSettings, settingsStore])
 
-  function generateSchedule() {
+  useEffect(() => {
+    let isCurrent = true
+
+    scheduleStore.loadSchedule(month).then((storedSchedule) => {
+      if (!isCurrent) {
+        return
+      }
+
+      setSchedule(storedSchedule)
+      if (storedSchedule) {
+        setCurrentStep(5)
+        setGenerationMessage('已載入已儲存班表')
+      }
+    })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [month, scheduleStore])
+
+  async function generateSchedule() {
+    setGenerationMessage('產生中')
+
     const result = runRelaxedScheduling(
       {
         employees,
@@ -168,6 +192,7 @@ function App() {
     )
 
     if (result.success) {
+      await scheduleStore.saveSchedule(result.schedule)
       setSchedule(result.schedule)
       setGenerationMessage(
         result.schedule.relaxedRules.length === 0
@@ -491,7 +516,7 @@ interface MonthlyWorkspaceProps {
   generationMessage: string | null
   manualSpecialDays: SpecialDay[]
   month: MonthString
-  onGenerate: () => void
+  onGenerate: () => void | Promise<void>
   onMonthChange: (month: MonthString) => void
   onPrevFourWeekDateChange: (date: DateString) => void
   onSetConstraints: (constraints: PersonalConstraint[]) => void
@@ -731,11 +756,11 @@ function StepFour({
   onGenerate,
 }: {
   generationMessage: string | null
-  onGenerate: () => void
+  onGenerate: () => void | Promise<void>
 }) {
   return (
     <div className="generatePanel">
-      <button onClick={onGenerate} type="button">
+      <button onClick={() => void onGenerate()} type="button">
         產生班表
       </button>
       {generationMessage && <p>{generationMessage}</p>}

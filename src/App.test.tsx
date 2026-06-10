@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
@@ -133,4 +133,33 @@ describe('App', () => {
 
     expect(screen.getByLabelText('R15 啟用')).toBeChecked()
   })
+
+  it('persists generated monthly schedules in IndexedDB and reloads the month', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<App />)
+
+    await generateVisibleSchedule(user)
+
+    expect(screen.getByRole('table', { name: '班表檢視' })).toBeInTheDocument()
+
+    unmount()
+    render(<App />)
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: 'Step 5：檢視 / 調整 / 匯出' }),
+      ).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('table', { name: '班表檢視' })).toBeInTheDocument()
+  })
 })
+
+async function generateVisibleSchedule(
+  user: ReturnType<typeof userEvent.setup>,
+) {
+  await user.click(screen.getByRole('button', { name: '下一步' }))
+  await user.click(screen.getByRole('button', { name: '下一步' }))
+  await user.click(screen.getByRole('button', { name: '下一步' }))
+  await user.click(screen.getByRole('button', { name: '產生班表' }))
+  await screen.findByRole('heading', { name: 'Step 5：檢視 / 調整 / 匯出' })
+}
