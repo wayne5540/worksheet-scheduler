@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+./scripts/verify-workflow.sh
+
+if [ -f package.json ]; then
+  npm run verify
+fi

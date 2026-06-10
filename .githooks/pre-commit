@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fail() {
+  printf 'pre-commit: %s\n' "$*" >&2
+  exit 1
+}
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+./scripts/verify-workflow.sh
+
+if ! git diff --cached --name-only --diff-filter=ACMR | grep -qx 'PROGRESS.md'; then
+  fail "stage PROGRESS.md with every commit so progress stays durable."
+fi
+
+if [ -f package.json ]; then
+  command -v npm >/dev/null 2>&1 || fail "npm is required."
+  [ -d node_modules ] || fail "node_modules is missing; run npm install before committing package changes."
+  npm run verify
+fi

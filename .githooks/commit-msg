@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+message_file="$1"
+
+fail() {
+  printf 'commit-msg: %s\n' "$*" >&2
+  exit 1
+}
+
+subject="$(sed -n '1p' "$message_file")"
+[ -n "$subject" ] || fail "commit title is required."
+
+for section in Why How Goal Result; do
+  if ! grep -qi "^$section:" "$message_file"; then
+    fail "commit body must include '$section:'"
+  fi
+done

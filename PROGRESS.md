@@ -8,10 +8,10 @@ Last updated: 2026-06-10
 - [x] Added shared AI collaboration rules in `AGENTS.md`.
 - [x] Added `CLAUDE.md` as a symlink to `AGENTS.md`.
 - [x] Added `docs/DEVELOPMENT_WORKFLOW.md` for package, TDD, commit, progress, hook, and handoff rules.
+- [x] Added versioned git hooks for commit message, progress, symlink, and verification enforcement.
 
 ## In Progress
 
-- [ ] Add versioned git hooks for commit message, progress, symlink, and verification enforcement.
 - [ ] Add the initial React + TypeScript + Vite TDD toolchain.
 
 ## Todo
@@ -27,3 +27,5 @@ Last updated: 2026-06-10
 
 - The repository started with only `PLAN.md`; workflow setup must stay lightweight and avoid premature scheduling-engine abstractions.
 - `PLAN.md` recommends React or Vue; this workflow selects React + TypeScript + Vite because it is a stable, common SPA stack with straightforward testing support.
+- Git hooks are stored in `.githooks` and require `git config core.hooksPath .githooks` after they are committed.
+- `pre-commit` intentionally requires `PROGRESS.md` in every commit to keep progress durable across multiple AI contributors.
