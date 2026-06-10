@@ -17,14 +17,17 @@ Last updated: 2026-06-10
 - [x] Added Excel export structure tests and a minimal `.xlsx` workbook builder.
 - [x] Added scheduling relaxation-loop tests and orchestration implementation.
 - [x] Added a minimal deterministic attempt scheduler with prefill preservation, R09 pruning, and final validator checks.
+- [x] Added the first monthly scheduling UI workflow with stepper navigation, schedule generation, review table, and export action wiring.
 
 ## In Progress
 
-- [ ] Build the monthly scheduling UI workflow from `PLAN.md`.
+- [ ] Complete full UI workflow details from `PLAN.md` beyond the first functional monthly stepper.
 
 ## Todo
 
 - [ ] Expand attempt scheduler constraint propagation and performance coverage for realistic full-month R01-R15 staffing.
+- [ ] Wire UI state to browser persistence and replace seeded demo data with editable employee/rule/month records.
+- [ ] Add manual schedule cell editing, violation highlighting, and saved export download flow.
 
 ## Learnings
 
@@ -43,3 +46,4 @@ Last updated: 2026-06-10
 - Excel export currently builds the workbook structure and Blob; styling and pixel-perfect matching against the supplied template remain future UI/export polish.
 - Scheduling orchestration now owns prefill and rule relaxation; `attemptBacktrackingSchedule` provides the first injected search implementation.
 - The first attempt scheduler is intentionally small: it fills missing cells deterministically, prunes R09 late-to-early candidates, and relies on validators for final acceptance; it still needs stronger constraint propagation for realistic rosters.
+- The first UI workflow uses seeded employees and generates with the currently tractable R01/R09 rule subset so the stepper can exercise real scheduling/export plumbing without blocking on the full solver.

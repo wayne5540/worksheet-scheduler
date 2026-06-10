@@ -1,8 +1,129 @@
+import { useMemo, useState } from 'react'
+
+import { calculateFourWeekNodes } from './domain/fourWeekCycle'
+import type {
+  DateString,
+  Employee,
+  MonthString,
+  MonthlySchedule,
+  PersonalConstraint,
+  SpecialDay,
+} from './domain/model'
+import { DEFAULT_RULES } from './domain/rules'
+import {
+  buildScheduleWorkbook,
+  createScheduleWorkbookBlob,
+} from './export/excel'
+import {
+  attemptBacktrackingSchedule,
+  runRelaxedScheduling,
+} from './scheduling/scheduler'
 import './styles.css'
 
 const navItems = ['員工管理', '規則設定', '月度排班'] as const
+type NavItem = (typeof navItems)[number]
+
+const stepTitles = [
+  '月份設定',
+  '特別日標記',
+  '個人限制輸入',
+  '產生班表',
+  '檢視 / 調整 / 匯出',
+] as const
+
+const employees: Employee[] = [
+  {
+    id: 'emp-supervisor',
+    name: '主管',
+    isSupervisor: true,
+    isVeteran: true,
+    isPT: false,
+    isActive: true,
+    prevMonthLastShift: '國A',
+  },
+  {
+    id: 'emp-veteran',
+    name: '老手',
+    isSupervisor: false,
+    isVeteran: true,
+    isPT: false,
+    isActive: true,
+    prevMonthLastShift: '休',
+  },
+  {
+    id: 'emp-regular',
+    name: '一般員工',
+    isSupervisor: false,
+    isVeteran: false,
+    isPT: false,
+    isActive: true,
+    prevMonthLastShift: 'F13',
+  },
+]
 
 function App() {
+  const [activeTab, setActiveTab] = useState<NavItem>('月度排班')
+  const [currentStep, setCurrentStep] = useState(1)
+  const [month, setMonth] = useState<MonthString>('2026-06')
+  const [prevFourWeekDate, setPrevFourWeekDate] =
+    useState<DateString>('2026-05-15')
+  const [manualSpecialDays, setManualSpecialDays] = useState<SpecialDay[]>([])
+  const [constraints, setConstraints] = useState<PersonalConstraint[]>([])
+  const [schedule, setSchedule] = useState<MonthlySchedule | null>(null)
+  const [generationMessage, setGenerationMessage] = useState<string | null>(
+    null,
+  )
+
+  const fourWeekNodes = useMemo(
+    () => calculateFourWeekNodes(month, prevFourWeekDate),
+    [month, prevFourWeekDate],
+  )
+  const specialDays = useMemo(
+    () => [
+      ...manualSpecialDays,
+      ...fourWeekNodes.map(
+        (date): SpecialDay => ({
+          date,
+          type: '四周',
+        }),
+      ),
+    ],
+    [fourWeekNodes, manualSpecialDays],
+  )
+
+  function generateSchedule() {
+    const result = runRelaxedScheduling(
+      {
+        employees,
+        month,
+        prevFourWeekDate,
+        cycleCarryIn: employees.map((employee) => ({
+          employeeId: employee.id,
+          reiCount: 0,
+          xiuCount: 0,
+        })),
+        specialDays,
+        constraints,
+        lockedEntries: [],
+        rules: DEFAULT_RULES.filter((rule) => ['R01', 'R09'].includes(rule.id)),
+      },
+      attemptBacktrackingSchedule,
+    )
+
+    if (result.success) {
+      setSchedule(result.schedule)
+      setGenerationMessage(
+        result.schedule.relaxedRules.length === 0
+          ? '班表已產生'
+          : '班表已產生，部分規則已放寬',
+      )
+      setCurrentStep(5)
+      return
+    }
+
+    setGenerationMessage(result.reason)
+  }
+
   return (
     <main className="appShell">
       <header className="topBar">
@@ -14,9 +135,10 @@ function App() {
         <nav aria-label="主要頁面" className="tabs" role="tablist">
           {navItems.map((item) => (
             <button
-              aria-selected={item === '月度排班'}
+              aria-selected={item === activeTab}
               className="tab"
               key={item}
+              onClick={() => setActiveTab(item)}
               role="tab"
               type="button"
             >
@@ -26,54 +148,455 @@ function App() {
         </nav>
       </header>
 
-      <section aria-labelledby="monthly-schedule-title" className="workspace">
-        <div className="workspaceHeader">
-          <div>
-            <p className="eyebrow">Monthly Schedule</p>
-            <h2 id="monthly-schedule-title">月度排班</h2>
-          </div>
-
-          <div className="controls">
-            <label>
-              月份
-              <input defaultValue="2026-06" type="month" />
-            </label>
-            <button disabled type="button">
-              產生班表
-            </button>
-          </div>
-        </div>
-
-        <div className="scheduleFrame">
-          <table>
-            <caption>班表草稿</caption>
-            <thead>
-              <tr>
-                <th scope="col">員工</th>
-                <th scope="col">前一個月</th>
-                <th scope="col">1 一</th>
-                <th scope="col">2 二</th>
-                <th scope="col">3 三</th>
-                <th scope="col">4 四</th>
-                <th scope="col">5 五</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row">尚未新增</th>
-                <td aria-label="前一個月班別">-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+      {activeTab === '員工管理' && <EmployeeWorkspace employees={employees} />}
+      {activeTab === '規則設定' && <RuleWorkspace />}
+      {activeTab === '月度排班' && (
+        <MonthlyWorkspace
+          constraints={constraints}
+          currentStep={currentStep}
+          fourWeekNodes={fourWeekNodes}
+          generationMessage={generationMessage}
+          manualSpecialDays={manualSpecialDays}
+          month={month}
+          onGenerate={generateSchedule}
+          onMonthChange={setMonth}
+          onPrevFourWeekDateChange={setPrevFourWeekDate}
+          onSetConstraints={setConstraints}
+          onSetCurrentStep={setCurrentStep}
+          onSetManualSpecialDays={setManualSpecialDays}
+          prevFourWeekDate={prevFourWeekDate}
+          schedule={schedule}
+          specialDays={specialDays}
+        />
+      )}
     </main>
   )
+}
+
+function EmployeeWorkspace({ employees }: { employees: Employee[] }) {
+  return (
+    <section aria-labelledby="employee-title" className="workspace">
+      <WorkspaceTitle
+        eyebrow="Employees"
+        title="員工管理"
+        titleId="employee-title"
+      />
+      <div className="toolbar">
+        <button type="button">新增員工</button>
+      </div>
+      <div className="scheduleFrame">
+        <table>
+          <caption>員工清單</caption>
+          <thead>
+            <tr>
+              <th scope="col">姓名</th>
+              <th scope="col">主管</th>
+              <th scope="col">老手</th>
+              <th scope="col">PT</th>
+              <th scope="col">啟用</th>
+              <th scope="col">前月末班</th>
+              <th scope="col">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {employees.map((employee) => (
+              <tr key={employee.id}>
+                <th scope="row">{employee.name}</th>
+                <td>{employee.isSupervisor ? '是' : '否'}</td>
+                <td>{employee.isVeteran ? '是' : '否'}</td>
+                <td>{employee.isPT ? '是' : '否'}</td>
+                <td>{employee.isActive ? '啟用' : '停用'}</td>
+                <td>{employee.prevMonthLastShift ?? '-'}</td>
+                <td>
+                  <button className="textButton" type="button">
+                    刪除
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function RuleWorkspace() {
+  return (
+    <section aria-labelledby="rule-title" className="workspace">
+      <WorkspaceTitle eyebrow="Rules" title="規則設定" titleId="rule-title" />
+      <div className="toolbar">
+        <button type="button">還原預設順序</button>
+      </div>
+      <div className="scheduleFrame">
+        <table>
+          <caption>規則清單</caption>
+          <thead>
+            <tr>
+              <th scope="col">Priority</th>
+              <th scope="col">規則 ID</th>
+              <th scope="col">規則名稱</th>
+              <th scope="col">啟用</th>
+            </tr>
+          </thead>
+          <tbody>
+            {DEFAULT_RULES.map((rule) => (
+              <tr key={rule.id}>
+                <td>{rule.priority}</td>
+                <th scope="row">{rule.id}</th>
+                <td>{rule.name}</td>
+                <td>啟用</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+interface MonthlyWorkspaceProps {
+  constraints: PersonalConstraint[]
+  currentStep: number
+  fourWeekNodes: DateString[]
+  generationMessage: string | null
+  manualSpecialDays: SpecialDay[]
+  month: MonthString
+  onGenerate: () => void
+  onMonthChange: (month: MonthString) => void
+  onPrevFourWeekDateChange: (date: DateString) => void
+  onSetConstraints: (constraints: PersonalConstraint[]) => void
+  onSetCurrentStep: (step: number) => void
+  onSetManualSpecialDays: (specialDays: SpecialDay[]) => void
+  prevFourWeekDate: DateString
+  schedule: MonthlySchedule | null
+  specialDays: SpecialDay[]
+}
+
+function MonthlyWorkspace({
+  constraints,
+  currentStep,
+  fourWeekNodes,
+  generationMessage,
+  manualSpecialDays,
+  month,
+  onGenerate,
+  onMonthChange,
+  onPrevFourWeekDateChange,
+  onSetConstraints,
+  onSetCurrentStep,
+  onSetManualSpecialDays,
+  prevFourWeekDate,
+  schedule,
+  specialDays,
+}: MonthlyWorkspaceProps) {
+  return (
+    <section aria-labelledby="monthly-schedule-title" className="workspace">
+      <WorkspaceTitle
+        eyebrow="Monthly Schedule"
+        title="月度排班"
+        titleId="monthly-schedule-title"
+      />
+
+      <ol className="stepper" aria-label="排班步驟">
+        {stepTitles.map((title, index) => (
+          <li
+            aria-current={currentStep === index + 1 ? 'step' : undefined}
+            key={title}
+          >
+            {index + 1}. {title}
+          </li>
+        ))}
+      </ol>
+
+      <div className="workflowPanel">
+        <h2>{`Step ${currentStep}：${stepTitles[currentStep - 1]}`}</h2>
+        {currentStep === 1 && (
+          <StepOne
+            fourWeekNodes={fourWeekNodes}
+            month={month}
+            onMonthChange={onMonthChange}
+            onPrevFourWeekDateChange={onPrevFourWeekDateChange}
+            prevFourWeekDate={prevFourWeekDate}
+          />
+        )}
+        {currentStep === 2 && (
+          <StepTwo
+            manualSpecialDays={manualSpecialDays}
+            month={month}
+            onSetManualSpecialDays={onSetManualSpecialDays}
+            specialDays={specialDays}
+          />
+        )}
+        {currentStep === 3 && (
+          <StepThree
+            constraints={constraints}
+            onSetConstraints={onSetConstraints}
+          />
+        )}
+        {currentStep === 4 && (
+          <StepFour
+            generationMessage={generationMessage}
+            onGenerate={onGenerate}
+          />
+        )}
+        {currentStep === 5 && schedule && <StepFive schedule={schedule} />}
+      </div>
+
+      <div className="stepActions">
+        <button
+          disabled={currentStep === 1}
+          onClick={() => onSetCurrentStep(Math.max(1, currentStep - 1))}
+          type="button"
+        >
+          上一步
+        </button>
+        {currentStep < 4 && (
+          <button
+            onClick={() => onSetCurrentStep(currentStep + 1)}
+            type="button"
+          >
+            下一步
+          </button>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function StepOne({
+  fourWeekNodes,
+  month,
+  onMonthChange,
+  onPrevFourWeekDateChange,
+  prevFourWeekDate,
+}: {
+  fourWeekNodes: DateString[]
+  month: MonthString
+  onMonthChange: (month: MonthString) => void
+  onPrevFourWeekDateChange: (date: DateString) => void
+  prevFourWeekDate: DateString
+}) {
+  return (
+    <div className="formGrid">
+      <label>
+        月份
+        <input
+          onChange={(event) =>
+            onMonthChange(event.currentTarget.value as MonthString)
+          }
+          type="month"
+          value={month}
+        />
+      </label>
+      <label>
+        上次四周節點
+        <input
+          onChange={(event) =>
+            onPrevFourWeekDateChange(event.currentTarget.value as DateString)
+          }
+          type="date"
+          value={prevFourWeekDate}
+        />
+      </label>
+      <div className="summaryStrip">
+        {fourWeekNodes.map((date) => (
+          <span key={date}>{date}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function StepTwo({
+  manualSpecialDays,
+  month,
+  onSetManualSpecialDays,
+  specialDays,
+}: {
+  manualSpecialDays: SpecialDay[]
+  month: MonthString
+  onSetManualSpecialDays: (specialDays: SpecialDay[]) => void
+  specialDays: SpecialDay[]
+}) {
+  const holidayDate = `${month}-02` as DateString
+  const isHoliday = manualSpecialDays.some(
+    (day) => day.date === holidayDate && day.type === '假日',
+  )
+
+  return (
+    <div className="dayGrid">
+      <button
+        className={isHoliday ? 'dayButton selected' : 'dayButton'}
+        onClick={() =>
+          onSetManualSpecialDays(
+            isHoliday
+              ? manualSpecialDays.filter(
+                  (day) => !(day.date === holidayDate && day.type === '假日'),
+                )
+              : [...manualSpecialDays, { date: holidayDate, type: '假日' }],
+          )
+        }
+        type="button"
+      >
+        6/2 假日
+      </button>
+      {specialDays.map((day) => (
+        <span className="marker" key={`${day.date}-${day.type}`}>
+          {day.date} {day.type}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function StepThree({
+  constraints,
+  onSetConstraints,
+}: {
+  constraints: PersonalConstraint[]
+  onSetConstraints: (constraints: PersonalConstraint[]) => void
+}) {
+  const date = '2026-06-03' as DateString
+  const employee = employees[0]
+  const isForced = constraints.some(
+    (constraint) =>
+      constraint.employeeId === employee.id &&
+      constraint.forcedDaysOff.includes(date),
+  )
+
+  return (
+    <div className="dayGrid">
+      <button
+        className={isForced ? 'dayButton selected' : 'dayButton'}
+        onClick={() =>
+          onSetConstraints(
+            isForced
+              ? []
+              : [
+                  {
+                    employeeId: employee.id,
+                    month: '2026-06',
+                    forcedDaysOff: [date],
+                  },
+                ],
+          )
+        }
+        type="button"
+      >
+        主管 6/3 強制休假
+      </button>
+      <span className="marker">已設定 {isForced ? 1 : 0} 天</span>
+    </div>
+  )
+}
+
+function StepFour({
+  generationMessage,
+  onGenerate,
+}: {
+  generationMessage: string | null
+  onGenerate: () => void
+}) {
+  return (
+    <div className="generatePanel">
+      <button onClick={onGenerate} type="button">
+        產生班表
+      </button>
+      {generationMessage && <p>{generationMessage}</p>}
+    </div>
+  )
+}
+
+function StepFive({ schedule }: { schedule: MonthlySchedule }) {
+  const visibleDates = datesInMonth(schedule.month).slice(0, 5)
+
+  async function exportExcel() {
+    const workbook = buildScheduleWorkbook(schedule, employees)
+
+    await createScheduleWorkbookBlob(workbook)
+  }
+
+  return (
+    <>
+      <div className="toolbar">
+        <button type="button">驗證</button>
+        <button type="button">重新產生</button>
+        <button onClick={() => void exportExcel()} type="button">
+          匯出 Excel
+        </button>
+      </div>
+      <div className="scheduleFrame">
+        <table aria-label="班表檢視">
+          <caption>班表檢視</caption>
+          <thead>
+            <tr>
+              <th scope="col">員工</th>
+              <th scope="col">前一個月</th>
+              {visibleDates.map((date) => (
+                <th key={date} scope="col">
+                  {Number(date.slice(-2))}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {employees.map((employee) => (
+              <tr key={employee.id}>
+                <th scope="row">{employee.name}</th>
+                <td>{employee.prevMonthLastShift ?? '-'}</td>
+                {visibleDates.map((date) => (
+                  <td key={date}>
+                    {shiftFor(schedule, employee.id, date) ?? '-'}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+function WorkspaceTitle({
+  eyebrow,
+  title,
+  titleId,
+}: {
+  eyebrow: string
+  title: string
+  titleId: string
+}) {
+  return (
+    <div className="workspaceHeader">
+      <div>
+        <p className="eyebrow">{eyebrow}</p>
+        <h2 id={titleId}>{title}</h2>
+      </div>
+    </div>
+  )
+}
+
+function shiftFor(
+  schedule: MonthlySchedule,
+  employeeId: string,
+  date: DateString,
+) {
+  return schedule.entries.find(
+    (entry) => entry.employeeId === employeeId && entry.date === date,
+  )?.shift
+}
+
+function datesInMonth(month: MonthString): DateString[] {
+  const [year, monthNumber] = month.split('-').map(Number)
+  const dayCount = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate()
+
+  return Array.from({ length: dayCount }, (_, index) => {
+    const day = String(index + 1).padStart(2, '0')
+
+    return `${month}-${day}` as DateString
+  })
 }
 
 export default App
