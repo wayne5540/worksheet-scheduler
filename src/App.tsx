@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { calculateFourWeekNodes } from './domain/fourWeekCycle'
 import {
   SHIFT_TYPES,
+  type CycleCarryIn,
   type DateString,
   type Employee,
   type MonthString,
@@ -104,6 +105,7 @@ function App() {
   const [month, setMonth] = useState<MonthString>('2026-06')
   const [prevFourWeekDate, setPrevFourWeekDate] =
     useState<DateString>('2026-05-15')
+  const [cycleCarryIn, setCycleCarryIn] = useState<CycleCarryIn[]>([])
   const [manualSpecialDays, setManualSpecialDays] = useState<SpecialDay[]>([])
   const [constraints, setConstraints] = useState<PersonalConstraint[]>([])
   const [schedule, setSchedule] = useState<MonthlySchedule | null>(null)
@@ -148,6 +150,14 @@ function App() {
         .sort((left, right) => left.priority - right.priority),
     [ruleSettings],
   )
+  const normalizedCycleCarryIn = useMemo(
+    () => normalizeCycleCarryIn(cycleCarryIn, employees),
+    [cycleCarryIn, employees],
+  )
+  const monthConstraints = useMemo(
+    () => constraints.filter((constraint) => constraint.month === month),
+    [constraints, month],
+  )
 
   useEffect(() => {
     settingsStore.saveEmployees(employees)
@@ -182,6 +192,13 @@ function App() {
     void scheduleStore.saveSchedule(nextSchedule)
   }
 
+  function updateMonthConstraints(nextConstraints: PersonalConstraint[]) {
+    setConstraints((currentConstraints) => [
+      ...currentConstraints.filter((constraint) => constraint.month !== month),
+      ...nextConstraints,
+    ])
+  }
+
   async function generateSchedule() {
     setGenerationMessage('產生中')
 
@@ -190,13 +207,9 @@ function App() {
         employees,
         month,
         prevFourWeekDate,
-        cycleCarryIn: employees.map((employee) => ({
-          employeeId: employee.id,
-          reiCount: 0,
-          xiuCount: 0,
-        })),
+        cycleCarryIn: normalizedCycleCarryIn,
         specialDays,
-        constraints,
+        constraints: monthConstraints,
         lockedEntries: [],
         rules: activeRules,
       },
@@ -291,7 +304,8 @@ function App() {
       {activeTab === '月度排班' && (
         <MonthlyWorkspace
           activeRules={activeRules}
-          constraints={constraints}
+          constraints={monthConstraints}
+          cycleCarryIn={normalizedCycleCarryIn}
           currentStep={currentStep}
           employees={employees}
           fourWeekNodes={fourWeekNodes}
@@ -302,7 +316,8 @@ function App() {
           onMonthChange={setMonth}
           onPrevFourWeekDateChange={setPrevFourWeekDate}
           onScheduleChange={updateSchedule}
-          onSetConstraints={setConstraints}
+          onSetConstraints={updateMonthConstraints}
+          onSetCycleCarryIn={setCycleCarryIn}
           onSetCurrentStep={setCurrentStep}
           onSetManualSpecialDays={setManualSpecialDays}
           prevFourWeekDate={prevFourWeekDate}
@@ -525,6 +540,7 @@ function RuleWorkspace({
 interface MonthlyWorkspaceProps {
   activeRules: RuleDefinition[]
   constraints: PersonalConstraint[]
+  cycleCarryIn: CycleCarryIn[]
   currentStep: number
   employees: Employee[]
   fourWeekNodes: DateString[]
@@ -536,6 +552,7 @@ interface MonthlyWorkspaceProps {
   onPrevFourWeekDateChange: (date: DateString) => void
   onScheduleChange: (schedule: MonthlySchedule) => void
   onSetConstraints: (constraints: PersonalConstraint[]) => void
+  onSetCycleCarryIn: (cycleCarryIn: CycleCarryIn[]) => void
   onSetCurrentStep: (step: number) => void
   onSetManualSpecialDays: (specialDays: SpecialDay[]) => void
   prevFourWeekDate: DateString
@@ -546,6 +563,7 @@ interface MonthlyWorkspaceProps {
 function MonthlyWorkspace({
   activeRules,
   constraints,
+  cycleCarryIn,
   currentStep,
   employees,
   fourWeekNodes,
@@ -557,6 +575,7 @@ function MonthlyWorkspace({
   onPrevFourWeekDateChange,
   onScheduleChange,
   onSetConstraints,
+  onSetCycleCarryIn,
   onSetCurrentStep,
   onSetManualSpecialDays,
   prevFourWeekDate,
@@ -586,8 +605,11 @@ function MonthlyWorkspace({
         <h2>{`Step ${currentStep}：${stepTitles[currentStep - 1]}`}</h2>
         {currentStep === 1 && (
           <StepOne
+            cycleCarryIn={cycleCarryIn}
+            employees={employees}
             fourWeekNodes={fourWeekNodes}
             month={month}
+            onSetCycleCarryIn={onSetCycleCarryIn}
             onMonthChange={onMonthChange}
             onPrevFourWeekDateChange={onPrevFourWeekDateChange}
             prevFourWeekDate={prevFourWeekDate}
@@ -605,6 +627,7 @@ function MonthlyWorkspace({
           <StepThree
             constraints={constraints}
             employees={employees}
+            month={month}
             onSetConstraints={onSetConstraints}
           />
         )}
@@ -646,46 +669,129 @@ function MonthlyWorkspace({
 }
 
 function StepOne({
+  cycleCarryIn,
+  employees,
   fourWeekNodes,
   month,
+  onSetCycleCarryIn,
   onMonthChange,
   onPrevFourWeekDateChange,
   prevFourWeekDate,
 }: {
+  cycleCarryIn: CycleCarryIn[]
+  employees: Employee[]
   fourWeekNodes: DateString[]
   month: MonthString
+  onSetCycleCarryIn: (cycleCarryIn: CycleCarryIn[]) => void
   onMonthChange: (month: MonthString) => void
   onPrevFourWeekDateChange: (date: DateString) => void
   prevFourWeekDate: DateString
 }) {
+  function updateCarryIn(
+    employeeId: string,
+    field: keyof Pick<CycleCarryIn, 'reiCount' | 'xiuCount'>,
+    value: number,
+  ) {
+    onSetCycleCarryIn(
+      cycleCarryIn.map((carryIn) =>
+        carryIn.employeeId === employeeId
+          ? { ...carryIn, [field]: Math.max(0, value) }
+          : carryIn,
+      ),
+    )
+  }
+
   return (
-    <div className="formGrid">
-      <label>
-        月份
-        <input
-          onChange={(event) =>
-            onMonthChange(event.currentTarget.value as MonthString)
-          }
-          type="month"
-          value={month}
-        />
-      </label>
-      <label>
-        上次四周節點
-        <input
-          onChange={(event) =>
-            onPrevFourWeekDateChange(event.currentTarget.value as DateString)
-          }
-          type="date"
-          value={prevFourWeekDate}
-        />
-      </label>
-      <div className="summaryStrip">
-        {fourWeekNodes.map((date) => (
-          <span key={date}>{date}</span>
-        ))}
+    <>
+      <div className="formGrid">
+        <label>
+          月份
+          <input
+            onChange={(event) =>
+              onMonthChange(event.currentTarget.value as MonthString)
+            }
+            type="month"
+            value={month}
+          />
+        </label>
+        <label>
+          上次四周節點
+          <input
+            onChange={(event) =>
+              onPrevFourWeekDateChange(event.currentTarget.value as DateString)
+            }
+            type="date"
+            value={prevFourWeekDate}
+          />
+        </label>
+        <div className="summaryStrip">
+          {fourWeekNodes.map((date) => (
+            <span key={date}>{date}</span>
+          ))}
+        </div>
       </div>
-    </div>
+      {requiresCarryIn(month, prevFourWeekDate) && (
+        <div className="scheduleFrame setupTable">
+          <table>
+            <caption>四周結轉</caption>
+            <thead>
+              <tr>
+                <th scope="col">員工</th>
+                <th scope="col">上月例假結轉</th>
+                <th scope="col">上月休假結轉</th>
+              </tr>
+            </thead>
+            <tbody>
+              {employees.map((employee) => {
+                const carryIn = cycleCarryIn.find(
+                  (candidate) => candidate.employeeId === employee.id,
+                ) ?? {
+                  employeeId: employee.id,
+                  reiCount: 0,
+                  xiuCount: 0,
+                }
+
+                return (
+                  <tr key={employee.id}>
+                    <th scope="row">{employee.name}</th>
+                    <td>
+                      <input
+                        aria-label={`${employee.name} 上月例假結轉`}
+                        min={0}
+                        onChange={(event) =>
+                          updateCarryIn(
+                            employee.id,
+                            'reiCount',
+                            event.currentTarget.valueAsNumber || 0,
+                          )
+                        }
+                        type="number"
+                        value={carryIn.reiCount}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        aria-label={`${employee.name} 上月休假結轉`}
+                        min={0}
+                        onChange={(event) =>
+                          updateCarryIn(
+                            employee.id,
+                            'xiuCount',
+                            event.currentTarget.valueAsNumber || 0,
+                          )
+                        }
+                        type="number"
+                        value={carryIn.xiuCount}
+                      />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -700,28 +806,38 @@ function StepTwo({
   onSetManualSpecialDays: (specialDays: SpecialDay[]) => void
   specialDays: SpecialDay[]
 }) {
-  const holidayDate = `${month}-02` as DateString
-  const isHoliday = manualSpecialDays.some(
-    (day) => day.date === holidayDate && day.type === '假日',
-  )
-
   return (
     <div className="dayGrid">
-      <button
-        className={isHoliday ? 'dayButton selected' : 'dayButton'}
-        onClick={() =>
-          onSetManualSpecialDays(
-            isHoliday
-              ? manualSpecialDays.filter(
-                  (day) => !(day.date === holidayDate && day.type === '假日'),
-                )
-              : [...manualSpecialDays, { date: holidayDate, type: '假日' }],
-          )
-        }
-        type="button"
-      >
-        6/2 假日
-      </button>
+      {datesInMonth(month).map((date) => {
+        const selectedTypes = manualSpecialDays
+          .filter((day) => day.date === date)
+          .map((day) => day.type)
+
+        return (
+          <div className="daySetup" key={date}>
+            <span>{Number(date.slice(-2))}</span>
+            {(['假日', '店務', '大清'] as const).map((type) => {
+              const isSelected = selectedTypes.includes(type)
+
+              return (
+                <button
+                  aria-label={`${date} ${type}`}
+                  aria-pressed={isSelected}
+                  className={isSelected ? 'dayButton selected' : 'dayButton'}
+                  onClick={() =>
+                    onSetManualSpecialDays(
+                      toggleSpecialDay(manualSpecialDays, date, type),
+                    )
+                  }
+                  type="button"
+                >
+                  {type}
+                </button>
+              )
+            })}
+          </div>
+        )
+      })}
       {specialDays.map((day) => (
         <span className="marker" key={`${day.date}-${day.type}`}>
           {day.date} {day.type}
@@ -734,42 +850,75 @@ function StepTwo({
 function StepThree({
   constraints,
   employees,
+  month,
   onSetConstraints,
 }: {
   constraints: PersonalConstraint[]
   employees: Employee[]
+  month: MonthString
   onSetConstraints: (constraints: PersonalConstraint[]) => void
 }) {
-  const date = '2026-06-03' as DateString
-  const employee = employees[0] ?? DEFAULT_EMPLOYEES[0]
-  const isForced = constraints.some(
-    (constraint) =>
-      constraint.employeeId === employee.id &&
-      constraint.forcedDaysOff.includes(date),
-  )
-
   return (
-    <div className="dayGrid">
-      <button
-        className={isForced ? 'dayButton selected' : 'dayButton'}
-        onClick={() =>
-          onSetConstraints(
-            isForced
-              ? []
-              : [
-                  {
-                    employeeId: employee.id,
-                    month: '2026-06',
-                    forcedDaysOff: [date],
-                  },
-                ],
-          )
-        }
-        type="button"
-      >
-        主管 6/3 強制休假
-      </button>
-      <span className="marker">已設定 {isForced ? 1 : 0} 天</span>
+    <div className="scheduleFrame">
+      <table>
+        <caption>個人限制</caption>
+        <thead>
+          <tr>
+            <th scope="col">員工</th>
+            {datesInMonth(month).map((date) => (
+              <th key={date} scope="col">
+                {Number(date.slice(-2))}
+              </th>
+            ))}
+            <th scope="col">統計</th>
+          </tr>
+        </thead>
+        <tbody>
+          {employees.map((employee) => {
+            const forcedDaysOff =
+              constraints.find(
+                (constraint) => constraint.employeeId === employee.id,
+              )?.forcedDaysOff ?? []
+
+            return (
+              <tr key={employee.id}>
+                <th scope="row">{employee.name}</th>
+                {datesInMonth(month).map((date) => {
+                  const isForced = forcedDaysOff.includes(date)
+
+                  return (
+                    <td key={date}>
+                      <button
+                        aria-label={`${employee.name} ${date} 指休`}
+                        aria-pressed={isForced}
+                        className={
+                          isForced ? 'dayButton selected' : 'dayButton'
+                        }
+                        onClick={() =>
+                          onSetConstraints(
+                            toggleForcedDayOff(
+                              constraints,
+                              employee.id,
+                              month,
+                              date,
+                            ),
+                          )
+                        }
+                        type="button"
+                      >
+                        指
+                      </button>
+                    </td>
+                  )
+                })}
+                <td>
+                  {employee.name} 已設定 {forcedDaysOff.length} 天
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -1030,6 +1179,91 @@ function entryFor(
   )
 }
 
+function normalizeCycleCarryIn(
+  cycleCarryIn: CycleCarryIn[],
+  employees: Employee[],
+): CycleCarryIn[] {
+  return employees.map((employee) => {
+    const existingCarryIn = cycleCarryIn.find(
+      (candidate) => candidate.employeeId === employee.id,
+    )
+
+    return (
+      existingCarryIn ?? {
+        employeeId: employee.id,
+        reiCount: 0,
+        xiuCount: 0,
+      }
+    )
+  })
+}
+
+function requiresCarryIn(
+  month: MonthString,
+  prevFourWeekDate: DateString,
+): boolean {
+  return addDays(parseDate(prevFourWeekDate), 1).getTime() < monthStart(month)
+}
+
+function toggleSpecialDay(
+  specialDays: SpecialDay[],
+  date: DateString,
+  type: Exclude<SpecialDay['type'], '四周'>,
+): SpecialDay[] {
+  const isSelected = specialDays.some(
+    (day) => day.date === date && day.type === type,
+  )
+
+  if (isSelected) {
+    return specialDays.filter(
+      (day) => !(day.date === date && day.type === type),
+    )
+  }
+
+  return [
+    ...specialDays.filter(
+      (day) =>
+        day.date !== date ||
+        type === '假日' ||
+        (day.type !== '店務' && day.type !== '大清'),
+    ),
+    { date, type },
+  ]
+}
+
+function toggleForcedDayOff(
+  constraints: PersonalConstraint[],
+  employeeId: string,
+  month: MonthString,
+  date: DateString,
+): PersonalConstraint[] {
+  const existingConstraint = constraints.find(
+    (constraint) => constraint.employeeId === employeeId,
+  )
+  const existingForcedDays = existingConstraint?.forcedDaysOff ?? []
+  const forcedDaysOff = existingForcedDays.includes(date)
+    ? existingForcedDays.filter((forcedDate) => forcedDate !== date)
+    : [...existingForcedDays, date].sort((left, right) =>
+        left.localeCompare(right),
+      )
+  const remainingConstraints = constraints.filter(
+    (constraint) => constraint.employeeId !== employeeId,
+  )
+
+  if (forcedDaysOff.length === 0) {
+    return remainingConstraints
+  }
+
+  return [
+    ...remainingConstraints,
+    {
+      employeeId,
+      month,
+      forcedDaysOff,
+    },
+  ]
+}
+
 function datesInMonth(month: MonthString): DateString[] {
   const [year, monthNumber] = month.split('-').map(Number)
   const dayCount = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate()
@@ -1039,6 +1273,28 @@ function datesInMonth(month: MonthString): DateString[] {
 
     return `${month}-${day}` as DateString
   })
+}
+
+function monthStart(month: MonthString): number {
+  const [year, monthNumber] = month.split('-').map(Number)
+
+  return Date.UTC(year, monthNumber - 1, 1)
+}
+
+function parseDate(date: DateString): Date {
+  const [year, month, day] = date.split('-').map(Number)
+
+  return new Date(Date.UTC(year, month - 1, day))
+}
+
+function addDays(date: Date, days: number): Date {
+  return new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate() + days,
+    ),
+  )
 }
 
 export default App

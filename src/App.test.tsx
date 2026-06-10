@@ -38,13 +38,15 @@ describe('App', () => {
     expect(
       screen.getByRole('heading', { name: 'Step 2：特別日標記' }),
     ).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '6/2 假日' }))
+    await user.click(screen.getByRole('button', { name: '2026-06-02 假日' }))
 
     await user.click(screen.getByRole('button', { name: '下一步' }))
     expect(
       screen.getByRole('heading', { name: 'Step 3：個人限制輸入' }),
     ).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '主管 6/3 強制休假' }))
+    await user.click(
+      screen.getByRole('button', { name: '主管 2026-06-03 指休' }),
+    )
 
     await user.click(screen.getByRole('button', { name: '下一步' }))
     expect(
@@ -155,6 +157,45 @@ describe('App', () => {
       ).toBeInTheDocument(),
     )
     expect(screen.getByRole('table', { name: '班表檢視' })).toBeInTheDocument()
+  })
+
+  it('edits monthly carry-in, special days, and personal constraints', async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await user.clear(screen.getByLabelText('主管 上月例假結轉'))
+    await user.type(screen.getByLabelText('主管 上月例假結轉'), '2')
+    await user.clear(screen.getByLabelText('主管 上月休假結轉'))
+    await user.type(screen.getByLabelText('主管 上月休假結轉'), '1')
+
+    expect(screen.getByLabelText('主管 上月例假結轉')).toHaveValue(2)
+    expect(screen.getByLabelText('主管 上月休假結轉')).toHaveValue(1)
+
+    await user.click(screen.getByRole('button', { name: '下一步' }))
+    await user.click(screen.getByRole('button', { name: '2026-06-10 假日' }))
+    await user.click(screen.getByRole('button', { name: '2026-06-10 店務' }))
+    await user.click(screen.getByRole('button', { name: '2026-06-10 大清' }))
+
+    expect(
+      screen.getByRole('button', { name: '2026-06-10 假日' }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    expect(
+      screen.getByRole('button', { name: '2026-06-10 店務' }),
+    ).toHaveAttribute('aria-pressed', 'false')
+    expect(
+      screen.getByRole('button', { name: '2026-06-10 大清' }),
+    ).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(screen.getByRole('button', { name: '下一步' }))
+    await user.click(
+      screen.getByRole('button', { name: '老手 2026-06-05 指休' }),
+    )
+
+    expect(
+      screen.getByRole('button', { name: '老手 2026-06-05 指休' }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('老手 已設定 1 天')).toBeInTheDocument()
   })
 
   it('persists manual schedule cell edits in IndexedDB', async () => {
