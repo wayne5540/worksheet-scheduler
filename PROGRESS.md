@@ -40,7 +40,7 @@ Last updated: 2026-06-10
 
 ## In Progress
 
-- [ ] Audit remaining PLAN requirements against the current implementation.
+- None.
 
 ## Todo
 
