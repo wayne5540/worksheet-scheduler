@@ -58,7 +58,14 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: '產生班表' }))
 
     expect(
-      await screen.findByRole('heading', {
+      await screen.findByText('班表已產生，部分規則已放寬'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('已放寬規則')).toBeInTheDocument()
+    expect(screen.getByText(/R15 大清日人力/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '前往查看班表' }))
+
+    expect(
+      screen.getByRole('heading', {
         name: 'Step 5：檢視 / 調整 / 匯出',
       }),
     ).toBeInTheDocument()
@@ -81,8 +88,6 @@ describe('App', () => {
     expect(screen.getByText('排班結果')).toBeInTheDocument()
     expect(screen.getByText('需求人力')).toBeInTheDocument()
     expect(screen.getByText('合格（A/B）')).toBeInTheDocument()
-    expect(screen.getByText('已放寬規則')).toBeInTheDocument()
-    expect(screen.getByText(/R15 大清日人力/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '匯出 Excel' })).toBeEnabled()
   })
 
@@ -402,6 +407,9 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: '重新產生' }))
 
+    await user.click(
+      await screen.findByRole('button', { name: '前往查看班表' }),
+    )
     await waitFor(() =>
       expect(screen.getByLabelText('主管 2026-06-01 班別')).toHaveValue(
         generatedShift,
@@ -442,6 +450,20 @@ async function generateVisibleSchedule(
 ) {
   await goToGenerateStep(user)
   await user.click(screen.getByRole('button', { name: '產生班表' }))
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Step 5：檢視 / 調整 / 匯出',
+      }) ?? screen.queryByRole('button', { name: '前往查看班表' }),
+    ).toBeInTheDocument(),
+  )
+
+  const reviewButton = screen.queryByRole('button', { name: '前往查看班表' })
+
+  if (reviewButton) {
+    await user.click(reviewButton)
+  }
+
   await screen.findByRole('heading', { name: 'Step 5：檢視 / 調整 / 匯出' })
 }
 

@@ -51,6 +51,8 @@ const stepTitles = [
   '檢視 / 調整 / 匯出',
 ] as const
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'] as const
+const GENERATED_MESSAGE = '班表已產生'
+const PARTIAL_RELAXED_MESSAGE = '班表已產生，部分規則已放寬'
 
 const DEFAULT_EMPLOYEES: Employee[] = [
   {
@@ -363,10 +365,10 @@ function App() {
       setSchedule(result.schedule)
       setGenerationMessage(
         result.schedule.relaxedRules.length === 0
-          ? '班表已產生'
-          : '班表已產生，部分規則已放寬',
+          ? GENERATED_MESSAGE
+          : PARTIAL_RELAXED_MESSAGE,
       )
-      setCurrentStep(5)
+      setCurrentStep(result.schedule.relaxedRules.length === 0 ? 5 : 4)
       return
     }
 
@@ -839,6 +841,12 @@ function MonthlyWorkspace({
           <StepFour
             generationMessage={generationMessage}
             onGenerate={onGenerate}
+            onViewSchedule={() => onSetCurrentStep(5)}
+            relaxedRules={
+              generationMessage === PARTIAL_RELAXED_MESSAGE
+                ? (schedule?.relaxedRules ?? [])
+                : []
+            }
           />
         )}
         {currentStep === 5 && schedule && (
@@ -1132,9 +1140,13 @@ function StepThree({
 function StepFour({
   generationMessage,
   onGenerate,
+  onViewSchedule,
+  relaxedRules,
 }: {
   generationMessage: string | null
   onGenerate: () => void | Promise<void>
+  onViewSchedule: () => void
+  relaxedRules: MonthlySchedule['relaxedRules']
 }) {
   return (
     <div className="generatePanel">
@@ -1142,6 +1154,14 @@ function StepFour({
         產生班表
       </button>
       {generationMessage && <p>{generationMessage}</p>}
+      {relaxedRules.length > 0 && (
+        <>
+          <RelaxedRulesSummary relaxedRules={relaxedRules} />
+          <button onClick={onViewSchedule} type="button">
+            前往查看班表
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -1235,23 +1255,7 @@ function StepFive({
         </button>
       </div>
       {schedule.relaxedRules.length > 0 && (
-        <div
-          aria-label="已放寬規則"
-          className="validationSummary"
-          role="status"
-        >
-          <h3>已放寬規則</h3>
-          <ul>
-            {schedule.relaxedRules.map((relaxedRule, index) => (
-              <li key={`${relaxedRule.ruleId}-${index}`}>
-                {relaxedRule.ruleId} {relaxedRule.ruleName}：
-                {relaxedRule.affectedDates.length > 0
-                  ? relaxedRule.affectedDates.join('、')
-                  : '未提供日期'}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <RelaxedRulesSummary relaxedRules={schedule.relaxedRules} />
       )}
       {violations.length > 0 && (
         <div aria-label="違規清單" className="validationSummary" role="status">
@@ -1379,6 +1383,28 @@ function StepFive({
         </table>
       </div>
     </>
+  )
+}
+
+function RelaxedRulesSummary({
+  relaxedRules,
+}: {
+  relaxedRules: MonthlySchedule['relaxedRules']
+}) {
+  return (
+    <div aria-label="已放寬規則" className="validationSummary" role="status">
+      <h3>已放寬規則</h3>
+      <ul>
+        {relaxedRules.map((relaxedRule, index) => (
+          <li key={`${relaxedRule.ruleId}-${index}`}>
+            {relaxedRule.ruleId} {relaxedRule.ruleName}：
+            {relaxedRule.affectedDates.length > 0
+              ? relaxedRule.affectedDates.join('、')
+              : '未提供日期'}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
