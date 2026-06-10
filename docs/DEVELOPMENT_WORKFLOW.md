@@ -24,6 +24,7 @@
 - Node: `22.22.2`
 - npm: `10.9.7`
 - Package manager: npm with `package-lock.json`
+- App stack: React `19.2.7`, Vite `8.0.16`, TypeScript `6.0.3`, Vitest `4.1.8`
 
 ## TDD Loop
 
