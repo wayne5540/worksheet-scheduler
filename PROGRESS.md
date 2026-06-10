@@ -33,6 +33,7 @@ Last updated: 2026-06-10
 - [x] Added preflight generation errors for impossible staffing inputs.
 - [x] Added Step 4 partial-relaxation result review before entering Step 5.
 - [x] Added Step 4 loading state while schedule generation is running.
+- [x] Added Step 3 locked `特` / `公` leave entries before generation.
 
 ## In Progress
 

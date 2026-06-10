@@ -53,6 +53,8 @@ const stepTitles = [
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'] as const
 const GENERATED_MESSAGE = '班表已產生'
 const PARTIAL_RELAXED_MESSAGE = '班表已產生，部分規則已放寬'
+type LockedLeaveShift = Extract<ShiftType, '特' | '公'>
+const LOCKED_LEAVE_OPTIONS: (LockedLeaveShift | '')[] = ['', '特', '公']
 
 const DEFAULT_EMPLOYEES: Employee[] = [
   {
@@ -153,6 +155,7 @@ function App() {
   const [cycleCarryIn, setCycleCarryIn] = useState<CycleCarryIn[]>([])
   const [manualSpecialDays, setManualSpecialDays] = useState<SpecialDay[]>([])
   const [constraints, setConstraints] = useState<PersonalConstraint[]>([])
+  const [lockedEntries, setLockedEntries] = useState<ScheduleEntry[]>([])
   const [schedule, setSchedule] = useState<MonthlySchedule | null>(null)
   const [generationMessage, setGenerationMessage] = useState<string | null>(
     null,
@@ -359,7 +362,7 @@ function App() {
           cycleCarryIn: normalizedCycleCarryIn,
           specialDays,
           constraints: monthConstraints,
-          lockedEntries: [],
+          lockedEntries: entriesForMonth(lockedEntries, month),
           rules: activeRules,
         },
         attemptBacktrackingSchedule,
@@ -465,6 +468,7 @@ function App() {
           fourWeekNodes={fourWeekNodes}
           generationMessage={generationMessage}
           isGenerating={isGenerating}
+          lockedEntries={entriesForMonth(lockedEntries, month)}
           manualSpecialDays={manualSpecialDays}
           month={month}
           onGenerate={generateSchedule}
@@ -475,6 +479,7 @@ function App() {
           onSetConstraints={updateMonthConstraints}
           onSetCycleCarryIn={setCycleCarryIn}
           onSetCurrentStep={setCurrentStep}
+          onSetLockedEntries={setLockedEntries}
           onSetManualSpecialDays={setManualSpecialDays}
           prevFourWeekDate={prevFourWeekDate}
           schedule={schedule}
@@ -759,6 +764,7 @@ interface MonthlyWorkspaceProps {
   fourWeekNodes: DateString[]
   generationMessage: string | null
   isGenerating: boolean
+  lockedEntries: ScheduleEntry[]
   manualSpecialDays: SpecialDay[]
   month: MonthString
   onGenerate: () => void | Promise<void>
@@ -769,6 +775,7 @@ interface MonthlyWorkspaceProps {
   onSetConstraints: (constraints: PersonalConstraint[]) => void
   onSetCycleCarryIn: (cycleCarryIn: CycleCarryIn[]) => void
   onSetCurrentStep: (step: number) => void
+  onSetLockedEntries: (entries: ScheduleEntry[]) => void
   onSetManualSpecialDays: (specialDays: SpecialDay[]) => void
   prevFourWeekDate: DateString
   schedule: MonthlySchedule | null
@@ -784,6 +791,7 @@ function MonthlyWorkspace({
   fourWeekNodes,
   generationMessage,
   isGenerating,
+  lockedEntries,
   manualSpecialDays,
   month,
   onGenerate,
@@ -794,6 +802,7 @@ function MonthlyWorkspace({
   onSetConstraints,
   onSetCycleCarryIn,
   onSetCurrentStep,
+  onSetLockedEntries,
   onSetManualSpecialDays,
   prevFourWeekDate,
   schedule,
@@ -844,8 +853,10 @@ function MonthlyWorkspace({
           <StepThree
             constraints={constraints}
             employees={employees}
+            lockedEntries={lockedEntries}
             month={month}
             onSetConstraints={onSetConstraints}
+            onSetLockedEntries={onSetLockedEntries}
           />
         )}
         {currentStep === 4 && (
@@ -1076,14 +1087,35 @@ function StepTwo({
 function StepThree({
   constraints,
   employees,
+  lockedEntries,
   month,
   onSetConstraints,
+  onSetLockedEntries,
 }: {
   constraints: PersonalConstraint[]
   employees: Employee[]
+  lockedEntries: ScheduleEntry[]
   month: MonthString
   onSetConstraints: (constraints: PersonalConstraint[]) => void
+  onSetLockedEntries: (entries: ScheduleEntry[]) => void
 }) {
+  function updateForcedDayOff(employeeId: string, date: DateString) {
+    onSetLockedEntries(setLockedLeaveEntry(lockedEntries, employeeId, date, ''))
+    onSetConstraints(toggleForcedDayOff(constraints, employeeId, month, date))
+  }
+
+  function updateLockedLeave(
+    employeeId: string,
+    date: DateString,
+    shift: LockedLeaveShift | '',
+  ) {
+    onSetLockedEntries(setLockedLeaveEntry(lockedEntries, employeeId, date, shift))
+
+    if (shift !== '') {
+      onSetConstraints(removeForcedDayOff(constraints, employeeId, month, date))
+    }
+  }
+
   return (
     <div className="scheduleFrame">
       <table>
@@ -1104,36 +1136,55 @@ function StepThree({
             const forcedDaysOff =
               constraints.find(
                 (constraint) => constraint.employeeId === employee.id,
-              )?.forcedDaysOff ?? []
+                )?.forcedDaysOff ?? []
 
             return (
               <tr key={employee.id}>
                 <th scope="row">{employee.name}</th>
                 {datesInMonth(month).map((date) => {
                   const isForced = forcedDaysOff.includes(date)
+                  const lockedLeave = lockedLeaveFor(
+                    lockedEntries,
+                    employee.id,
+                    date,
+                  )
 
                   return (
                     <td key={date}>
-                      <button
-                        aria-label={`${employee.name} ${date} 指休`}
-                        aria-pressed={isForced}
-                        className={
-                          isForced ? 'dayButton selected' : 'dayButton'
-                        }
-                        onClick={() =>
-                          onSetConstraints(
-                            toggleForcedDayOff(
-                              constraints,
+                      <div className="constraintCell">
+                        <button
+                          aria-label={`${employee.name} ${date} 指休`}
+                          aria-pressed={isForced}
+                          className={
+                            isForced ? 'dayButton selected' : 'dayButton'
+                          }
+                          disabled={lockedLeave !== ''}
+                          onClick={() => updateForcedDayOff(employee.id, date)}
+                          type="button"
+                        >
+                          指
+                        </button>
+                        <select
+                          aria-label={`${employee.name} ${date} 特公假`}
+                          className="compactSelect"
+                          onChange={(event) =>
+                            updateLockedLeave(
                               employee.id,
-                              month,
                               date,
-                            ),
-                          )
-                        }
-                        type="button"
-                      >
-                        指
-                      </button>
+                              event.currentTarget.value as
+                                | LockedLeaveShift
+                                | '',
+                            )
+                          }
+                          value={lockedLeave}
+                        >
+                          {LOCKED_LEAVE_OPTIONS.map((shift) => (
+                            <option key={shift || 'none'} value={shift}>
+                              {shift || '-'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </td>
                   )
                 })}
@@ -1825,6 +1876,86 @@ function toggleForcedDayOff(
       forcedDaysOff,
     },
   ]
+}
+
+function removeForcedDayOff(
+  constraints: PersonalConstraint[],
+  employeeId: string,
+  month: MonthString,
+  date: DateString,
+): PersonalConstraint[] {
+  const existingConstraint = constraints.find(
+    (constraint) => constraint.employeeId === employeeId,
+  )
+
+  if (!existingConstraint) {
+    return constraints
+  }
+
+  const forcedDaysOff = existingConstraint.forcedDaysOff.filter(
+    (forcedDate) => forcedDate !== date,
+  )
+  const remainingConstraints = constraints.filter(
+    (constraint) => constraint.employeeId !== employeeId,
+  )
+
+  if (forcedDaysOff.length === 0) {
+    return remainingConstraints
+  }
+
+  return [
+    ...remainingConstraints,
+    {
+      employeeId,
+      month,
+      forcedDaysOff,
+    },
+  ]
+}
+
+function lockedLeaveFor(
+  entries: ScheduleEntry[],
+  employeeId: string,
+  date: DateString,
+): LockedLeaveShift | '' {
+  const shift = entries.find(
+    (entry) => entry.employeeId === employeeId && entry.date === date,
+  )?.shift
+
+  return shift === '特' || shift === '公' ? shift : ''
+}
+
+function setLockedLeaveEntry(
+  entries: ScheduleEntry[],
+  employeeId: string,
+  date: DateString,
+  shift: LockedLeaveShift | '',
+): ScheduleEntry[] {
+  const remainingEntries = entries.filter(
+    (entry) => !(entry.employeeId === employeeId && entry.date === date),
+  )
+
+  if (shift === '') {
+    return remainingEntries
+  }
+
+  return [
+    ...remainingEntries,
+    {
+      employeeId,
+      date,
+      shift,
+      isAutoRelaxed: false,
+      isManualEdit: false,
+    },
+  ]
+}
+
+function entriesForMonth(
+  entries: ScheduleEntry[],
+  month: MonthString,
+): ScheduleEntry[] {
+  return entries.filter((entry) => entry.date.startsWith(`${month}-`))
 }
 
 function datesInMonth(month: MonthString): DateString[] {

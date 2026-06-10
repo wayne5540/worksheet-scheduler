@@ -251,6 +251,32 @@ describe('App', () => {
     expect(screen.getByText('老手 已設定 1 天')).toBeInTheDocument()
   })
 
+  it('prefills locked special and public leave before generation', async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '下一步' }))
+    await user.click(screen.getByRole('button', { name: '下一步' }))
+    await user.selectOptions(
+      screen.getByLabelText('主管 2026-06-01 特公假'),
+      '特',
+    )
+    await user.selectOptions(
+      screen.getByLabelText('老手 2026-06-02 特公假'),
+      '公',
+    )
+
+    await user.click(screen.getByRole('button', { name: '下一步' }))
+    await user.click(screen.getByRole('button', { name: '產生班表' }))
+    await user.click(
+      await screen.findByRole('button', { name: '前往查看班表' }),
+    )
+
+    expect(screen.getByLabelText('主管 2026-06-01 班別')).toHaveValue('特')
+    expect(screen.getByLabelText('老手 2026-06-02 班別')).toHaveValue('公')
+  })
+
   it('loads Step 1 carry-in from a saved previous-month schedule', async () => {
     const store = new IndexedDbScheduleStore()
 

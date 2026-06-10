@@ -296,6 +296,23 @@ td .dayButton {
   padding: 0 8px;
 }
 
+.constraintCell {
+  display: inline-grid;
+  grid-template-columns: 44px 54px;
+  gap: 6px;
+  align-items: center;
+}
+
+.compactSelect {
+  min-height: 34px;
+  border: 1px solid #cbd5cf;
+  border-radius: 8px;
+  padding: 0 6px;
+  color: #24312f;
+  background: #ffffff;
+  font: inherit;
+}
+
 .generatePanel {
   display: grid;
   gap: 12px;
