@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -56,9 +56,23 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: '產生班表' }))
 
     expect(
-      screen.getByRole('heading', { name: 'Step 5：檢視 / 調整 / 匯出' }),
+      await screen.findByRole('heading', {
+        name: 'Step 5：檢視 / 調整 / 匯出',
+      }),
     ).toBeInTheDocument()
-    expect(screen.getByRole('table', { name: '班表檢視' })).toBeInTheDocument()
+    const scheduleTable = screen.getByRole('table', { name: '班表檢視' })
+
+    expect(scheduleTable).toBeInTheDocument()
+    expect(
+      within(scheduleTable).getByRole('columnheader', { name: '30' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('F05 班人數')).toBeInTheDocument()
+    expect(screen.getByText('F13 班人數')).toBeInTheDocument()
+    expect(screen.getByText('A 班人數')).toBeInTheDocument()
+    expect(screen.getByText('上班總人數')).toBeInTheDocument()
+    expect(screen.getByText('排班結果')).toBeInTheDocument()
+    expect(screen.getByText('需求人力')).toBeInTheDocument()
+    expect(screen.getByText('合格（A/B）')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '匯出 Excel' })).toBeEnabled()
   })
 

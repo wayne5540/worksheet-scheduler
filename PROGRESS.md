@@ -23,14 +23,14 @@ Last updated: 2026-06-10
 - [x] Added manual schedule cell editing, violation highlighting, and saved export download flow.
 - [x] Expanded the attempt scheduler with a constructive full-month staffing path and coverage for realistic R01-R15 rosters.
 - [x] Replaced seeded Step 1-3 monthly setup controls with editable carry-in, special-day, and personal-constraint records.
+- [x] Expanded Step 5 schedule review to a full-month table with PLAN summary rows.
 
 ## In Progress
 
-- [ ] Expand Step 5 schedule review to a full-month table with PLAN summary rows.
+- [ ] Add employee row ordering and rule priority reordering controls.
 
 ## Todo
 
-- [ ] Add employee row ordering and rule priority reordering controls.
 - [ ] Compute Step 1 carry-in automatically from saved previous-month schedules when available.
 - [ ] Improve Excel styling/template fidelity against the supplied workbook format.
 
@@ -57,3 +57,4 @@ Last updated: 2026-06-10
 - Step 5 uses editable shift selects for visible schedule cells, saves manual edits back to IndexedDB, validates with the active rule list, and downloads Excel exports through a temporary object URL.
 - Store-meeting days count `A` as R08 late coverage, and deep-clean days are excluded from R08 so R15 owns the 8-person staffing requirement.
 - Step 1-3 setup is now month-driven: carry-in rows follow employees, special-day toggles cover every date with 店務/大清 mutual exclusion, and personal constraints are stored per employee for the active month.
+- Step 5 now renders the full month plus staffing summary rows; the summary logic mirrors the export counts closely enough for UI review, while export styling remains separate polish.

@@ -821,6 +821,7 @@ function StepTwo({
 
               return (
                 <button
+                  key={type}
                   aria-label={`${date} ${type}`}
                   aria-pressed={isSelected}
                   className={isSelected ? 'dayButton selected' : 'dayButton'}
@@ -952,8 +953,11 @@ function StepFive({
   schedule: MonthlySchedule
 }) {
   const [violations, setViolations] = useState<RuleViolation[]>([])
-  const visibleDates = datesInMonth(schedule.month).slice(0, 5)
+  const visibleDates = datesInMonth(schedule.month)
   const invalidCellKeys = buildInvalidCellKeys(violations, employees)
+  const dailyStats = visibleDates.map((date) =>
+    buildScheduleDailyStats(schedule, employees, date),
+  )
 
   async function exportExcel() {
     const workbook = buildScheduleWorkbook(schedule, employees)
@@ -1082,6 +1086,49 @@ function StepFive({
                 })}
               </tr>
             ))}
+            {[
+              {
+                label: 'F05 班人數',
+                values: dailyStats.map((stats) => String(stats.f05Count)),
+              },
+              {
+                label: 'F13 班人數',
+                values: dailyStats.map((stats) => String(stats.f13Count)),
+              },
+              {
+                label: 'A 班人數',
+                values: dailyStats.map((stats) => String(stats.aCount)),
+              },
+              {
+                label: '上班總人數',
+                values: dailyStats.map((stats) => String(stats.workCount)),
+              },
+              {
+                label: '排班結果',
+                values: dailyStats.map(
+                  (stats) =>
+                    `${stats.f05Count}F05 0F01 ${stats.f13Count}F13 ${stats.aCount}A`,
+                ),
+              },
+              {
+                label: '需求人力',
+                values: dailyStats.map((stats) => stats.demandLabel),
+              },
+              {
+                label: '合格（A/B）',
+                values: dailyStats.map((stats) =>
+                  stats.isQualified ? 'A' : 'B',
+                ),
+              },
+            ].map((row) => (
+              <tr key={row.label}>
+                <th scope="row">{row.label}</th>
+                <td />
+                {row.values.map((value, index) => (
+                  <td key={`${row.label}-${visibleDates[index]}`}>{value}</td>
+                ))}
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -1176,6 +1223,77 @@ function entryFor(
 ) {
   return schedule.entries.find(
     (entry) => entry.employeeId === employeeId && entry.date === date,
+  )
+}
+
+interface ScheduleDailyStats {
+  aCount: number
+  demandLabel: string
+  f05Count: number
+  f13Count: number
+  isQualified: boolean
+  workCount: number
+}
+
+function buildScheduleDailyStats(
+  schedule: MonthlySchedule,
+  employees: Employee[],
+  date: DateString,
+): ScheduleDailyStats {
+  const shifts = employees
+    .filter((employee) => employee.isActive && !employee.isPT)
+    .map((employee) => entryFor(schedule, employee.id, date)?.shift)
+  const f05Count = shifts.filter(
+    (shift) => shift === 'F05' || shift === '國05',
+  ).length
+  const f13Count = shifts.filter(
+    (shift) => shift === 'F13' || shift === '國13',
+  ).length
+  const aCount = shifts.filter(
+    (shift) => shift === 'A' || shift === '國A',
+  ).length
+  const workCount = shifts.filter(isScheduleWorkShift).length
+  const isHoliday = hasScheduleSpecialDay(schedule, date, '假日')
+  const isStoreDay = hasScheduleSpecialDay(schedule, date, '店務')
+  const isDeepCleanDay = hasScheduleSpecialDay(schedule, date, '大清')
+  const requiredLateCount = isHoliday || isDeepCleanDay ? 5 : 4
+  const actualLateCount = isStoreDay ? aCount : f13Count
+  const demandLabel = isHoliday
+    ? `3國05 5${isStoreDay ? '國A' : '國13'}`
+    : isDeepCleanDay
+      ? `至少8人`
+      : `3F05 4${isStoreDay ? 'A' : 'F13'}`
+
+  return {
+    aCount,
+    demandLabel,
+    f05Count,
+    f13Count,
+    isQualified: isDeepCleanDay
+      ? workCount >= 8
+      : f05Count === 3 && actualLateCount === requiredLateCount,
+    workCount,
+  }
+}
+
+function hasScheduleSpecialDay(
+  schedule: MonthlySchedule,
+  date: DateString,
+  type: SpecialDay['type'],
+): boolean {
+  return schedule.specialDays.some(
+    (specialDay) => specialDay.date === date && specialDay.type === type,
+  )
+}
+
+function isScheduleWorkShift(shift: ShiftType | undefined): boolean {
+  return (
+    shift === 'F05' ||
+    shift === 'F13' ||
+    shift === 'A' ||
+    shift === '國05' ||
+    shift === '國13' ||
+    shift === '國A'
   )
 }
 
