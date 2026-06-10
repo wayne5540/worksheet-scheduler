@@ -21,14 +21,15 @@ Last updated: 2026-06-10
 - [x] Wired employee and rule setting UI state to `localStorage` with editable employee rows and rule enable toggles.
 - [x] Persisted generated monthly schedules to IndexedDB and reload them by month in the UI.
 - [x] Added manual schedule cell editing, violation highlighting, and saved export download flow.
+- [x] Expanded the attempt scheduler with a constructive full-month staffing path and coverage for realistic R01-R15 rosters.
 
 ## In Progress
 
-- [ ] Expand attempt scheduler constraint propagation and performance coverage for realistic full-month R01-R15 staffing.
+- [ ] Replace remaining seeded monthly demo defaults with fully editable month setup records.
 
 ## Todo
 
-- [ ] Replace remaining seeded monthly demo defaults with fully editable month setup records.
+- None.
 
 ## Learnings
 
@@ -46,8 +47,9 @@ Last updated: 2026-06-10
 - Excel export uses `write-excel-file`; npm `xlsx@0.18.5` was checked and avoided because `npm audit` reports high severity advisories without a fix.
 - Excel export currently builds the workbook structure and Blob; styling and pixel-perfect matching against the supplied template remain future UI/export polish.
 - Scheduling orchestration now owns prefill and rule relaxation; `attemptBacktrackingSchedule` provides the first injected search implementation.
-- The first attempt scheduler is intentionally small: it fills missing cells deterministically, prunes R09 late-to-early candidates, and relies on validators for final acceptance; it still needs stronger constraint propagation for realistic rosters.
-- The first UI workflow uses seeded employees and generates with the currently tractable R01/R09 rule subset so the stepper can exercise real scheduling/export plumbing without blocking on the full solver.
+- The attempt scheduler now uses the original lightweight fill path for narrow rule sets and a constructive full-month staffing path for active coverage/cycle rules; final validators still own correctness.
+- The first UI workflow still starts with seeded monthly defaults, but generation now passes the full active rule list and relies on relaxation when the demo roster cannot satisfy staffing rules.
 - Employee and rule settings in the UI now use `LocalStorageSettingsStore`; generated monthly schedules use `IndexedDbScheduleStore`.
 - Generated schedules are saved through `IndexedDbScheduleStore` after successful generation; App reloads a saved month into Step 5 when available.
 - Step 5 uses editable shift selects for visible schedule cells, saves manual edits back to IndexedDB, validates with the active rule list, and downloads Excel exports through a temporary object URL.
+- Store-meeting days count `A` as R08 late coverage, and deep-clean days are excluded from R08 so R15 owns the 8-person staffing requirement.

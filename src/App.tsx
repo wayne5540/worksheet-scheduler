@@ -198,7 +198,7 @@ function App() {
         specialDays,
         constraints,
         lockedEntries: [],
-        rules: activeRules.filter((rule) => ['R01', 'R09'].includes(rule.id)),
+        rules: activeRules,
       },
       attemptBacktrackingSchedule,
     )

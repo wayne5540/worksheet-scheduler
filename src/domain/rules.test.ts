@@ -185,6 +185,39 @@ describe('rule validators', () => {
     )
   })
 
+  it('R08 treats store days as A late coverage and leaves deep-clean staffing to R15', () => {
+    expect(
+      validateRule(
+        'R08',
+        makeInput({
+          specialDays: [{ date: '2026-06-08', type: '店務' }],
+          overrides: {
+            '2026-06-08': {
+              'sup-late': 'A',
+              'emp-b': 'A',
+              'emp-c': 'A',
+              'emp-d': 'A',
+            },
+          },
+        }),
+      ),
+    ).toEqual([])
+
+    expect(
+      validateRule(
+        'R08',
+        makeInput({
+          specialDays: [{ date: '2026-06-10', type: '大清' }],
+          overrides: {
+            '2026-06-10': {
+              'emp-off': 'F13',
+            },
+          },
+        }),
+      ),
+    ).toEqual([])
+  })
+
   it('R09 rejects late shift to early shift on the next day, including month start', () => {
     expectViolation(
       'R09',

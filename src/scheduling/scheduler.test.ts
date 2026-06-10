@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { Employee, ScheduleEntry } from '../domain/model'
-import { DEFAULT_RULES } from '../domain/rules'
+import { DEFAULT_RULES, validateRules } from '../domain/rules'
 import {
   attemptBacktrackingSchedule,
   prefillLockedEntries,
@@ -183,6 +183,92 @@ describe('scheduler orchestration', () => {
       reason: '無法產生符合目前規則的班表',
     })
   })
+
+  it('attemptBacktrackingSchedule builds a full-month schedule for the default staffing rules', () => {
+    const realisticEmployees = makeRealisticEmployees()
+    const request = makeRequest({
+      employees: realisticEmployees,
+      prevFourWeekDate: '2026-05-31',
+      cycleCarryIn: realisticEmployees.map((employee) => ({
+        employeeId: employee.id,
+        reiCount: 0,
+        xiuCount: 0,
+      })),
+      rules: DEFAULT_RULES,
+    })
+    const result = attemptBacktrackingSchedule(makeAttemptInput(request))
+
+    expect(result.success).toBe(true)
+
+    if (result.success) {
+      expect(result.entries).toHaveLength(realisticEmployees.length * 30)
+      expect(
+        validateRules(
+          {
+            employees: realisticEmployees,
+            month: request.month,
+            prevFourWeekDate: request.prevFourWeekDate,
+            cycleCarryIn: request.cycleCarryIn,
+            specialDays: request.specialDays,
+            constraints: request.constraints,
+            entries: result.entries,
+          },
+          DEFAULT_RULES,
+        ),
+      ).toEqual([])
+    }
+  })
+
+  it('attemptBacktrackingSchedule handles holiday, store-day, and deep-clean staffing in a full month', () => {
+    const realisticEmployees = makeRealisticEmployees()
+    const specialDays: ScheduleRequest['specialDays'] = [
+      { date: '2026-06-10', type: '假日' },
+      { date: '2026-06-16', type: '店務' },
+      { date: '2026-06-24', type: '大清' },
+    ]
+    const request = makeRequest({
+      employees: realisticEmployees,
+      prevFourWeekDate: '2026-05-31',
+      cycleCarryIn: realisticEmployees.map((employee) => ({
+        employeeId: employee.id,
+        reiCount: 0,
+        xiuCount: 0,
+      })),
+      specialDays,
+      rules: DEFAULT_RULES,
+    })
+    const result = attemptBacktrackingSchedule(makeAttemptInput(request))
+
+    expect(result.success).toBe(true)
+
+    if (result.success) {
+      expect(
+        validateRules(
+          {
+            employees: realisticEmployees,
+            month: request.month,
+            prevFourWeekDate: request.prevFourWeekDate,
+            cycleCarryIn: request.cycleCarryIn,
+            specialDays,
+            constraints: request.constraints,
+            entries: result.entries,
+          },
+          DEFAULT_RULES,
+        ),
+      ).toEqual([])
+      expect(shiftsOn(result.entries, '2026-06-10')).toEqual(
+        expect.arrayContaining(['國05', '國13', '國']),
+      )
+      expect(
+        shiftsOn(result.entries, '2026-06-16').filter((shift) => shift === 'A'),
+      ).toHaveLength(4)
+      expect(
+        shiftsOn(result.entries, '2026-06-24').filter((shift) =>
+          ['F05', 'F13', 'A', '國05', '國13', '國A'].includes(shift),
+        ).length,
+      ).toBeGreaterThanOrEqual(8)
+    }
+  })
 })
 
 function makeRequest(
@@ -220,5 +306,46 @@ function makeEntry(
     shift,
     isAutoRelaxed: false,
     isManualEdit: false,
+  }
+}
+
+function shiftsOn(entries: ScheduleEntry[], date: ScheduleEntry['date']) {
+  return entries
+    .filter((entry) => entry.date === date)
+    .map((entry) => entry.shift)
+}
+
+function makeRealisticEmployees(): Employee[] {
+  return [
+    makeEmployee('sup-a', { isSupervisor: true, isVeteran: true }),
+    makeEmployee('sup-b', { isSupervisor: true }),
+    makeEmployee('sup-c', { isSupervisor: true }),
+    makeEmployee('vet-a', { isVeteran: true }),
+    makeEmployee('vet-b', { isVeteran: true }),
+    makeEmployee('vet-c', { isVeteran: true }),
+    makeEmployee('emp-02', { isVeteran: true }),
+    makeEmployee('emp-01', { isSupervisor: true }),
+    makeEmployee('emp-03', { isVeteran: true }),
+    makeEmployee('emp-04'),
+    makeEmployee('emp-05'),
+    makeEmployee('emp-06'),
+    makeEmployee('emp-07'),
+    makeEmployee('emp-08'),
+  ]
+}
+
+function makeEmployee(
+  id: string,
+  overrides: Partial<Omit<Employee, 'id' | 'name'>> = {},
+): Employee {
+  return {
+    id,
+    name: id,
+    isSupervisor: false,
+    isVeteran: false,
+    isPT: false,
+    isActive: true,
+    prevMonthLastShift: null,
+    ...overrides,
   }
 }

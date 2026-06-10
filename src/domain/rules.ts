@@ -300,14 +300,18 @@ function validateR07(input: RuleValidationInput): RuleViolation[] {
 
 function validateR08(input: RuleValidationInput): RuleViolation[] {
   const holidayDates = specialDayDateSet(input, '假日')
+  const storeDates = specialDayDateSet(input, '店務')
+  const deepCleanDates = specialDayDateSet(input, '大清')
   const dates = datesInMonth(input.month).filter((date) => {
-    if (holidayDates.has(date)) {
+    if (holidayDates.has(date) || deepCleanDates.has(date)) {
       return false
     }
 
+    const requiredLateShift: ShiftType = storeDates.has(date) ? 'A' : 'F13'
+
     return (
       countShifts(input, date, (shift) => shift === 'F05') !== 3 ||
-      countShifts(input, date, (shift) => shift === 'F13') !== 4
+      countShifts(input, date, (shift) => shift === requiredLateShift) !== 4
     )
   })
 
