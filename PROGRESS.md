@@ -37,6 +37,7 @@ Last updated: 2026-06-10
 - [x] Added drag-and-drop ordering for employees and rules.
 - [x] Added type-specific Step 2 special-day color states.
 - [x] Added user-triggered clearing for saved monthly schedules.
+- [x] Added README instructions for installing, testing, and opening the app.
 
 ## In Progress
 
