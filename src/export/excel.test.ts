@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { Cell, CellObject } from 'write-excel-file/browser'
 
 import type { Employee, MonthlySchedule } from '../domain/model'
 import {
@@ -43,7 +44,14 @@ describe('Excel export', () => {
 
     expect(workbook.sheetName).toBe('排班_2026年6月')
     expect(workbook.fileName).toBe('排班_2026年6月.xlsx')
-    expect(workbook.rows[0].slice(0, 6)).toEqual([
+
+    expect(cellObjectAt(workbook.rows[0][0])).toMatchObject({
+      value: '排班_2026年6月',
+      columnSpan: 40,
+      fontWeight: 'bold',
+      align: 'center',
+    })
+    expect(cellValues(workbook.rows[1].slice(0, 6))).toEqual([
       '',
       '',
       '',
@@ -51,7 +59,7 @@ describe('Excel export', () => {
       '假日 / 店務',
       '',
     ])
-    expect(workbook.rows[1].slice(0, 6)).toEqual([
+    expect(cellValues(workbook.rows[2].slice(0, 6))).toEqual([
       '員工姓名',
       '角色',
       '前一個月',
@@ -59,14 +67,51 @@ describe('Excel export', () => {
       new Date(Date.UTC(2026, 5, 2)),
       new Date(Date.UTC(2026, 5, 3)),
     ])
-    expect(workbook.rows[2].slice(0, 6)).toEqual(['', '', '', '一', '二', '三'])
-    expect(workbook.rows[1].slice(33)).toEqual(STAT_COLUMN_LABELS)
+    expect(cellValues(workbook.rows[3].slice(0, 6))).toEqual([
+      '',
+      '',
+      '',
+      '一',
+      '二',
+      '三',
+    ])
+    expect(cellValues(workbook.rows[2].slice(33))).toEqual(STAT_COLUMN_LABELS)
+  })
+
+  it('adds workbook layout options for template-style review', () => {
+    const workbook = buildScheduleWorkbook(makeSchedule(), employees)
+
+    expect(workbook.columns).toHaveLength(40)
+    expect(workbook.columns.slice(0, 6)).toEqual([
+      { width: 14 },
+      { width: 8 },
+      { width: 10 },
+      { width: 5 },
+      { width: 5 },
+      { width: 5 },
+    ])
+    expect(workbook.columns.slice(33)).toEqual(
+      STAT_COLUMN_LABELS.map(() => ({ width: 11 })),
+    )
+    expect(workbook.stickyRowsCount).toBe(4)
+    expect(workbook.stickyColumnsCount).toBe(3)
+    expect(workbook.orientation).toBe('landscape')
+    expect(workbook.showGridLines).toBe(false)
+
+    expect(cellObjectAt(workbook.rows[2][0])).toMatchObject({
+      backgroundColor: '#d9ead3',
+      fontWeight: 'bold',
+    })
+    expect(cellObjectAt(workbook.rows[1][4])).toMatchObject({
+      backgroundColor: '#fff2cc',
+      fontWeight: 'bold',
+    })
   })
 
   it('exports employee rows with role codes, previous month shift, daily shifts, and summary counts', () => {
     const workbook = buildScheduleWorkbook(makeSchedule(), employees)
 
-    expect(workbook.rows[3].slice(0, 7)).toEqual([
+    expect(cellValues(workbook.rows[4].slice(0, 7))).toEqual([
       '主管老手',
       'G',
       '國A',
@@ -75,7 +120,7 @@ describe('Excel export', () => {
       '例',
       '',
     ])
-    expect(workbook.rows[4].slice(0, 7)).toEqual([
+    expect(cellValues(workbook.rows[5].slice(0, 7))).toEqual([
       '老手',
       'J',
       '休',
@@ -84,7 +129,7 @@ describe('Excel export', () => {
       '休',
       '',
     ])
-    expect(workbook.rows[5].slice(0, 7)).toEqual([
+    expect(cellValues(workbook.rows[6].slice(0, 7))).toEqual([
       '一般員工',
       'ⅹ',
       'F13',
@@ -93,14 +138,16 @@ describe('Excel export', () => {
       '休',
       '',
     ])
-    expect(workbook.rows[3].slice(33)).toEqual([27, 1, 1, 4, 1, 0, 1])
+    expect(cellValues(workbook.rows[4].slice(33))).toEqual([
+      27, 1, 1, 4, 1, 0, 1,
+    ])
   })
 
   it('adds bottom daily statistics rows', () => {
     const workbook = buildScheduleWorkbook(makeSchedule(), employees)
-    const bottomRows = workbook.rows.slice(6)
+    const bottomRows = workbook.rows.slice(7)
 
-    expect(bottomRows.map((row) => row[0])).toEqual([
+    expect(bottomRows.map((row) => cellValue(row[0]))).toEqual([
       'F05 班人數',
       'F13 班人數',
       'A 班人數',
@@ -109,7 +156,7 @@ describe('Excel export', () => {
       '上班需要人力',
       '檢定結果',
     ])
-    expect(bottomRows.map((row) => row[3])).toEqual([
+    expect(bottomRows.map((row) => cellValue(row[3]))).toEqual([
       1,
       1,
       1,
@@ -118,7 +165,7 @@ describe('Excel export', () => {
       '3F05 4F13',
       'B',
     ])
-    expect(bottomRows.map((row) => row[4])).toEqual([
+    expect(bottomRows.map((row) => cellValue(row[4]))).toEqual([
       1,
       0,
       1,
@@ -137,6 +184,26 @@ describe('Excel export', () => {
     )
   })
 })
+
+function cellValues(cells: Cell[]): unknown[] {
+  return cells.map(cellValue)
+}
+
+function cellValue(cell: Cell): unknown {
+  return isCellObject(cell) ? cell.value : cell
+}
+
+function cellObjectAt(cell: Cell): CellObject {
+  if (!isCellObject(cell)) {
+    throw new Error(`Expected styled cell object, received ${String(cell)}`)
+  }
+
+  return cell
+}
+
+function isCellObject(cell: Cell): cell is CellObject {
+  return cell !== null && typeof cell === 'object' && !(cell instanceof Date)
+}
 
 function makeSchedule(): MonthlySchedule {
   return {

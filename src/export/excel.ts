@@ -1,5 +1,5 @@
 import writeExcelFile from 'write-excel-file/browser'
-import type { SheetData } from 'write-excel-file/browser'
+import type { CellObject, Row, SheetData } from 'write-excel-file/browser'
 
 import type {
   DateString,
@@ -21,9 +21,14 @@ export const STAT_COLUMN_LABELS = [
 ] as const
 
 export interface ScheduleWorkbook {
+  columns: WorkbookColumn[]
   fileName: string
+  orientation: 'landscape'
   sheetName: string
+  showGridLines: boolean
   rows: SheetData
+  stickyColumnsCount: number
+  stickyRowsCount: number
 }
 
 interface DailyStats {
@@ -35,6 +40,13 @@ interface DailyStats {
   isQualified: boolean
 }
 
+interface WorkbookColumn {
+  width: number
+}
+
+type CellValue = boolean | Date | number | string
+type CellStyle = Omit<Partial<CellObject>, 'value'>
+
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'] as const
 const REST_SHIFTS = ['休', '例', '國'] as const satisfies readonly ShiftType[]
 const WORK_SHIFTS = [
@@ -45,6 +57,66 @@ const WORK_SHIFTS = [
   '國13',
   '國A',
 ] as const satisfies readonly ShiftType[]
+const FIXED_COLUMN_COUNT = 3
+const DATE_COLUMN_WIDTH = 5
+const STAT_COLUMN_WIDTH = 11
+const BASE_CELL_STYLE = {
+  align: 'center',
+  alignVertical: 'center',
+  borderColor: '#b7b7b7',
+  borderStyle: 'thin',
+  fontFamily: 'Arial',
+  fontSize: 10,
+  wrap: true,
+} satisfies CellStyle
+const TITLE_STYLE = {
+  align: 'center',
+  backgroundColor: '#2f6f62',
+  fontSize: 16,
+  fontWeight: 'bold',
+  height: 26,
+  textColor: '#ffffff',
+} satisfies CellStyle
+const HEADER_STYLE = {
+  backgroundColor: '#d9ead3',
+  fontWeight: 'bold',
+  height: 22,
+} satisfies CellStyle
+const SPECIAL_DAY_STYLE = {
+  backgroundColor: '#fff2cc',
+  fontWeight: 'bold',
+} satisfies CellStyle
+const WEEKDAY_STYLE = {
+  backgroundColor: '#eeeeee',
+  fontWeight: 'bold',
+} satisfies CellStyle
+const EMPLOYEE_STYLE = {
+  backgroundColor: '#f3f6f4',
+  fontWeight: 'bold',
+} satisfies CellStyle
+const STAT_STYLE = {
+  backgroundColor: '#fce5cd',
+  fontWeight: 'bold',
+} satisfies CellStyle
+const SUMMARY_STYLE = {
+  backgroundColor: '#e2f0d9',
+  fontWeight: 'bold',
+} satisfies CellStyle
+const MANUAL_EDIT_STYLE = {
+  backgroundColor: '#cfe2f3',
+} satisfies CellStyle
+const AUTO_RELAXED_STYLE = {
+  backgroundColor: '#fff2cc',
+} satisfies CellStyle
+const REST_SHIFT_STYLE = {
+  backgroundColor: '#f4cccc',
+} satisfies CellStyle
+const HOLIDAY_WORK_SHIFT_STYLE = {
+  backgroundColor: '#d9ead3',
+} satisfies CellStyle
+const WORK_SHIFT_STYLE = {
+  backgroundColor: '#d9ead3',
+} satisfies CellStyle
 
 export function buildScheduleWorkbook(
   schedule: MonthlySchedule,
@@ -52,30 +124,26 @@ export function buildScheduleWorkbook(
 ): ScheduleWorkbook {
   const dates = datesInMonth(schedule.month)
   const title = formatScheduleTitle(schedule.month)
-  const specialDayMarkers = buildSpecialDayMarkers(schedule)
+  const totalColumnCount =
+    FIXED_COLUMN_COUNT + dates.length + STAT_COLUMN_LABELS.length
   const rows: SheetData = [
-    ['', '', '', ...dates.map((date) => specialDayMarkers.get(date) ?? '')],
-    [
-      '員工姓名',
-      '角色',
-      '前一個月',
-      ...dates.map(parseDate),
-      ...STAT_COLUMN_LABELS,
-    ],
-    [
-      '',
-      '',
-      '',
-      ...dates.map((date) => WEEKDAY_LABELS[parseDate(date).getUTCDay()]),
-    ],
+    buildTitleRow(title, totalColumnCount),
+    buildSpecialDayRow(schedule, dates),
+    buildHeaderRow(dates),
+    buildWeekdayRow(dates),
     ...employees.map((employee) => buildEmployeeRow(schedule, employee, dates)),
     ...buildBottomRows(schedule, employees, dates),
   ]
 
   return {
+    columns: buildColumns(dates.length),
     fileName: `${title}.xlsx`,
+    orientation: 'landscape',
     sheetName: title,
+    showGridLines: false,
     rows,
+    stickyColumnsCount: FIXED_COLUMN_COUNT,
+    stickyRowsCount: 4,
   }
 }
 
@@ -86,9 +154,65 @@ export async function createScheduleWorkbookBlob(
     {
       sheet: workbook.sheetName,
       data: workbook.rows,
+      columns: workbook.columns,
       dateFormat: 'yyyy/mm/dd',
+      orientation: workbook.orientation,
+      showGridLines: workbook.showGridLines,
+      stickyColumnsCount: workbook.stickyColumnsCount,
+      stickyRowsCount: workbook.stickyRowsCount,
     },
   ]).toBlob()
+}
+
+function buildTitleRow(title: string, totalColumnCount: number): Row {
+  return [
+    styledCell(title, {
+      ...TITLE_STYLE,
+      columnSpan: totalColumnCount,
+    }),
+    ...Array.from({ length: totalColumnCount - 1 }, () => null),
+  ]
+}
+
+function buildSpecialDayRow(
+  schedule: MonthlySchedule,
+  dates: DateString[],
+): Row {
+  const specialDayMarkers = buildSpecialDayMarkers(schedule)
+
+  return [
+    styledCell('', HEADER_STYLE),
+    styledCell('', HEADER_STYLE),
+    styledCell('', HEADER_STYLE),
+    ...dates.map((date) => {
+      const marker = specialDayMarkers.get(date) ?? ''
+
+      return styledCell(marker, marker ? SPECIAL_DAY_STYLE : HEADER_STYLE)
+    }),
+    ...blankCells(STAT_COLUMN_LABELS.length, HEADER_STYLE),
+  ]
+}
+
+function buildHeaderRow(dates: DateString[]): Row {
+  return [
+    styledCell('員工姓名', HEADER_STYLE),
+    styledCell('角色', HEADER_STYLE),
+    styledCell('前一個月', HEADER_STYLE),
+    ...dates.map((date) => styledCell(parseDate(date), HEADER_STYLE)),
+    ...STAT_COLUMN_LABELS.map((label) => styledCell(label, STAT_STYLE)),
+  ]
+}
+
+function buildWeekdayRow(dates: DateString[]): Row {
+  return [
+    styledCell('', WEEKDAY_STYLE),
+    styledCell('', WEEKDAY_STYLE),
+    styledCell('', WEEKDAY_STYLE),
+    ...dates.map((date) =>
+      styledCell(WEEKDAY_LABELS[parseDate(date).getUTCDay()], WEEKDAY_STYLE),
+    ),
+    ...blankCells(STAT_COLUMN_LABELS.length, WEEKDAY_STYLE),
+  ]
 }
 
 function buildEmployeeRow(
@@ -96,16 +220,19 @@ function buildEmployeeRow(
   employee: Employee,
   dates: DateString[],
 ): SheetData[number] {
-  const shifts = dates.map(
-    (date) => getShift(schedule.entries, employee.id, date) ?? '',
-  )
-
   return [
-    employee.name,
-    roleCode(employee),
-    employee.prevMonthLastShift ?? '',
-    ...shifts,
-    ...buildEmployeeStatCells(schedule, employee, dates),
+    styledCell(employee.name, EMPLOYEE_STYLE),
+    styledCell(roleCode(employee), roleStyle(employee)),
+    styledCell(
+      employee.prevMonthLastShift ?? '',
+      shiftStyle(employee.prevMonthLastShift),
+    ),
+    ...dates.map((date) =>
+      shiftCell(getEntry(schedule.entries, employee.id, date)),
+    ),
+    ...buildEmployeeStatCells(schedule, employee, dates).map((value) =>
+      styledCell(value, STAT_STYLE),
+    ),
   ]
 }
 
@@ -151,26 +278,47 @@ function buildBottomRows(
   )
 
   return [
-    ['F05 班人數', '', '', ...dailyStats.map((stats) => stats.f05Count)],
-    ['F13 班人數', '', '', ...dailyStats.map((stats) => stats.f13Count)],
-    ['A 班人數', '', '', ...dailyStats.map((stats) => stats.aCount)],
-    ['總人數', '', '', ...dailyStats.map((stats) => stats.workCount)],
-    [
+    buildBottomRow(
+      'F05 班人數',
+      dailyStats.map((stats) => stats.f05Count),
+    ),
+    buildBottomRow(
+      'F13 班人數',
+      dailyStats.map((stats) => stats.f13Count),
+    ),
+    buildBottomRow(
+      'A 班人數',
+      dailyStats.map((stats) => stats.aCount),
+    ),
+    buildBottomRow(
+      '總人數',
+      dailyStats.map((stats) => stats.workCount),
+    ),
+    buildBottomRow(
       '排班結果',
-      '',
-      '',
-      ...dailyStats.map(
+      dailyStats.map(
         (stats) =>
           `${stats.f05Count}F05 0F01 ${stats.f13Count}F13 ${stats.aCount}A`,
       ),
-    ],
-    ['上班需要人力', '', '', ...dailyStats.map((stats) => stats.demandLabel)],
-    [
+    ),
+    buildBottomRow(
+      '上班需要人力',
+      dailyStats.map((stats) => stats.demandLabel),
+    ),
+    buildBottomRow(
       '檢定結果',
-      '',
-      '',
-      ...dailyStats.map((stats) => (stats.isQualified ? 'A' : 'B')),
-    ],
+      dailyStats.map((stats) => (stats.isQualified ? 'A' : 'B')),
+    ),
+  ]
+}
+
+function buildBottomRow(label: string, values: CellValue[]): Row {
+  return [
+    styledCell(label, SUMMARY_STYLE),
+    styledCell('', SUMMARY_STYLE),
+    styledCell('', SUMMARY_STYLE),
+    ...values.map((value) => styledCell(value, SUMMARY_STYLE)),
+    ...blankCells(STAT_COLUMN_LABELS.length, SUMMARY_STYLE),
   ]
 }
 
@@ -245,9 +393,17 @@ function getShift(
   employeeId: string,
   date: DateString,
 ): ShiftType | undefined {
+  return getEntry(entries, employeeId, date)?.shift
+}
+
+function getEntry(
+  entries: ScheduleEntry[],
+  employeeId: string,
+  date: DateString,
+): ScheduleEntry | undefined {
   return entries.find(
     (entry) => entry.employeeId === employeeId && entry.date === date,
-  )?.shift
+  )
 }
 
 function hasSpecialDay(
@@ -272,6 +428,76 @@ function isWorkShift(shift: ShiftType | undefined): boolean {
     shift !== undefined &&
     WORK_SHIFTS.includes(shift as (typeof WORK_SHIFTS)[number])
   )
+}
+
+function buildColumns(dateCount: number): WorkbookColumn[] {
+  return [
+    { width: 14 },
+    { width: 8 },
+    { width: 10 },
+    ...Array.from({ length: dateCount }, () => ({ width: DATE_COLUMN_WIDTH })),
+    ...STAT_COLUMN_LABELS.map(() => ({ width: STAT_COLUMN_WIDTH })),
+  ]
+}
+
+function blankCells(count: number, style: CellStyle): CellObject[] {
+  return Array.from({ length: count }, () => styledCell('', style))
+}
+
+function styledCell(value: CellValue, style: CellStyle = {}): CellObject {
+  return {
+    value,
+    ...BASE_CELL_STYLE,
+    ...style,
+  }
+}
+
+function shiftCell(entry: ScheduleEntry | undefined): CellObject {
+  const value = entry?.shift ?? ''
+
+  if (entry?.isManualEdit) {
+    return styledCell(value, MANUAL_EDIT_STYLE)
+  }
+
+  if (entry?.isAutoRelaxed) {
+    return styledCell(value, AUTO_RELAXED_STYLE)
+  }
+
+  return styledCell(value, shiftStyle(value))
+}
+
+function shiftStyle(shift: ShiftType | '' | null): CellStyle {
+  if (shift === '休' || shift === '例' || shift === '國') {
+    return REST_SHIFT_STYLE
+  }
+
+  if (shift === '國05' || shift === '國13' || shift === '國A') {
+    return HOLIDAY_WORK_SHIFT_STYLE
+  }
+
+  if (shift === 'F05' || shift === 'F13' || shift === 'A') {
+    return WORK_SHIFT_STYLE
+  }
+
+  return {}
+}
+
+function roleStyle(employee: Employee): CellStyle {
+  if (employee.isSupervisor) {
+    return {
+      ...EMPLOYEE_STYLE,
+      backgroundColor: '#cfe2f3',
+    }
+  }
+
+  if (employee.isVeteran) {
+    return {
+      ...EMPLOYEE_STYLE,
+      backgroundColor: '#eadcf8',
+    }
+  }
+
+  return EMPLOYEE_STYLE
 }
 
 function formatScheduleTitle(month: MonthString): string {
