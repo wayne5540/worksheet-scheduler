@@ -30,10 +30,11 @@ Last updated: 2026-06-10
 - [x] Added rule descriptions, relaxed-rule reporting, and a functional regenerate action in the UI.
 - [x] Automated previous-month last-shift carry-forward from saved schedules.
 - [x] Added Step 5 special-day, date, and weekday header rows.
+- [x] Added preflight generation errors for impossible staffing inputs.
 
 ## In Progress
 
-- [ ] Add preflight generation errors for impossible staffing inputs.
+- [ ] Audit remaining PLAN requirements against the current implementation.
 
 ## Todo
 

@@ -80,6 +80,51 @@ const DEFAULT_EMPLOYEES: Employee[] = [
     isActive: true,
     prevMonthLastShift: 'F13',
   },
+  {
+    id: 'emp-supervisor-2',
+    name: '副主管',
+    isSupervisor: true,
+    isVeteran: false,
+    isPT: false,
+    isActive: true,
+    prevMonthLastShift: null,
+  },
+  {
+    id: 'emp-supervisor-3',
+    name: '資深主管',
+    isSupervisor: true,
+    isVeteran: true,
+    isPT: false,
+    isActive: true,
+    prevMonthLastShift: null,
+  },
+  {
+    id: 'emp-supervisor-4',
+    name: '值班主管',
+    isSupervisor: true,
+    isVeteran: false,
+    isPT: false,
+    isActive: true,
+    prevMonthLastShift: null,
+  },
+  {
+    id: 'emp-veteran-2',
+    name: '老手二',
+    isSupervisor: false,
+    isVeteran: true,
+    isPT: false,
+    isActive: true,
+    prevMonthLastShift: null,
+  },
+  {
+    id: 'emp-veteran-3',
+    name: '老手三',
+    isSupervisor: false,
+    isVeteran: true,
+    isPT: false,
+    isActive: true,
+    prevMonthLastShift: null,
+  },
 ]
 
 const PREV_MONTH_SHIFT_OPTIONS: (ShiftType | '')[] = ['', ...SHIFT_TYPES]
@@ -284,6 +329,19 @@ function App() {
   }
 
   async function generateSchedule() {
+    const preflightError = generationPreflightError({
+      activeRules,
+      employees,
+      month,
+      specialDays,
+    })
+
+    if (preflightError) {
+      setGenerationMessage(preflightError)
+      setCurrentStep(4)
+      return
+    }
+
     setGenerationMessage('產生中')
 
     const result = runRelaxedScheduling(
@@ -1496,6 +1554,84 @@ function isScheduleWorkShift(shift: ShiftType | undefined): boolean {
     shift === '國05' ||
     shift === '國13' ||
     shift === '國A'
+  )
+}
+
+function generationPreflightError({
+  activeRules,
+  employees,
+  month,
+  specialDays,
+}: {
+  activeRules: RuleDefinition[]
+  employees: Employee[]
+  month: MonthString
+  specialDays: SpecialDay[]
+}): string | null {
+  const schedulableEmployees = employees.filter(
+    (employee) => employee.isActive && !employee.isPT,
+  )
+  const activeRuleIds = new Set(activeRules.map((rule) => rule.id))
+
+  if (
+    (activeRuleIds.has('R03') || activeRuleIds.has('R04')) &&
+    schedulableEmployees.filter((employee) => employee.isSupervisor).length < 2
+  ) {
+    return '主管人數不足，至少需要 2 位啟用主管。'
+  }
+
+  const staffingMinimum = requiredStaffingMinimum(
+    month,
+    specialDays,
+    activeRuleIds,
+  )
+
+  if (schedulableEmployees.length < staffingMinimum) {
+    return `啟用員工數少於每日最低需求（需要至少 ${staffingMinimum} 人）。`
+  }
+
+  return null
+}
+
+function requiredStaffingMinimum(
+  month: MonthString,
+  specialDays: SpecialDay[],
+  activeRuleIds: Set<RuleDefinition['id']>,
+): number {
+  const dates = datesInMonth(month)
+  const holidayDates = specialDaySet(specialDays, '假日')
+  const deepCleanDates = specialDaySet(specialDays, '大清')
+  let minimum = 0
+
+  if (
+    activeRuleIds.has('R08') &&
+    dates.some((date) => !holidayDates.has(date) && !deepCleanDates.has(date))
+  ) {
+    minimum = Math.max(minimum, 7)
+  }
+
+  if (activeRuleIds.has('R10') && dates.some((date) => holidayDates.has(date))) {
+    minimum = Math.max(minimum, 8)
+  }
+
+  if (
+    activeRuleIds.has('R15') &&
+    dates.some((date) => deepCleanDates.has(date))
+  ) {
+    minimum = Math.max(minimum, 8)
+  }
+
+  return minimum
+}
+
+function specialDaySet(
+  specialDays: SpecialDay[],
+  type: SpecialDay['type'],
+): Set<DateString> {
+  return new Set(
+    specialDays
+      .filter((specialDay) => specialDay.type === type)
+      .map((specialDay) => specialDay.date),
   )
 }
 

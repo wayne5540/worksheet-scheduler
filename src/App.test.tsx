@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
-import type { MonthlySchedule, ShiftType } from './domain/model'
+import type { Employee, MonthlySchedule, ShiftType } from './domain/model'
 import { IndexedDbScheduleStore } from './persistence/persistence'
 
 describe('App', () => {
@@ -116,9 +116,9 @@ describe('App', () => {
 
     await user.click(screen.getByRole('tab', { name: '員工管理' }))
     await user.click(screen.getByRole('button', { name: '新增員工' }))
-    await user.clear(screen.getByLabelText('員工 4 姓名'))
-    await user.type(screen.getByLabelText('員工 4 姓名'), '新同事')
-    await user.click(screen.getByLabelText('員工 4 主管'))
+    await user.clear(screen.getByLabelText('員工 9 姓名'))
+    await user.type(screen.getByLabelText('員工 9 姓名'), '新同事')
+    await user.click(screen.getByLabelText('員工 9 主管'))
 
     expect(
       JSON.parse(localStorage.getItem('work-schedule:employees') ?? '[]'),
@@ -136,7 +136,7 @@ describe('App', () => {
     await user.click(screen.getByRole('tab', { name: '員工管理' }))
 
     expect(screen.getByDisplayValue('新同事')).toBeInTheDocument()
-    expect(screen.getByLabelText('員工 4 主管')).toBeChecked()
+    expect(screen.getByLabelText('員工 9 主管')).toBeChecked()
   })
 
   it('persists rule enabled settings and restores defaults', async () => {
@@ -286,6 +286,58 @@ describe('App', () => {
     expect(screen.getByLabelText('員工 3 前月末班')).toHaveValue('例')
   })
 
+  it('blocks generation when active employees are below staffing minimums', async () => {
+    const user = userEvent.setup()
+
+    saveEmployees([
+      makeEmployee('sup-a', { isSupervisor: true, isVeteran: true }),
+      makeEmployee('sup-b', { isSupervisor: true }),
+      makeEmployee('emp-1'),
+      makeEmployee('emp-2'),
+      makeEmployee('emp-3'),
+      makeEmployee('emp-4'),
+    ])
+
+    render(<App />)
+
+    await goToGenerateStep(user)
+    await user.click(screen.getByRole('button', { name: '產生班表' }))
+
+    expect(
+      screen.getByText('啟用員工數少於每日最低需求（需要至少 7 人）。'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Step 4：產生班表' }),
+    ).toBeInTheDocument()
+  })
+
+  it('blocks generation when fewer than two active supervisors are available', async () => {
+    const user = userEvent.setup()
+
+    saveEmployees([
+      makeEmployee('sup-a', { isSupervisor: true, isVeteran: true }),
+      makeEmployee('vet-a', { isVeteran: true }),
+      makeEmployee('vet-b', { isVeteran: true }),
+      makeEmployee('emp-1'),
+      makeEmployee('emp-2'),
+      makeEmployee('emp-3'),
+      makeEmployee('emp-4'),
+      makeEmployee('emp-5'),
+    ])
+
+    render(<App />)
+
+    await goToGenerateStep(user)
+    await user.click(screen.getByRole('button', { name: '產生班表' }))
+
+    expect(
+      screen.getByText('主管人數不足，至少需要 2 位啟用主管。'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Step 4：產生班表' }),
+    ).toBeInTheDocument()
+  })
+
   it('persists manual schedule cell edits in IndexedDB', async () => {
     const user = userEvent.setup()
     const { unmount } = render(<App />)
@@ -388,11 +440,35 @@ describe('App', () => {
 async function generateVisibleSchedule(
   user: ReturnType<typeof userEvent.setup>,
 ) {
-  await user.click(screen.getByRole('button', { name: '下一步' }))
-  await user.click(screen.getByRole('button', { name: '下一步' }))
-  await user.click(screen.getByRole('button', { name: '下一步' }))
+  await goToGenerateStep(user)
   await user.click(screen.getByRole('button', { name: '產生班表' }))
   await screen.findByRole('heading', { name: 'Step 5：檢視 / 調整 / 匯出' })
+}
+
+async function goToGenerateStep(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: '下一步' }))
+  await user.click(screen.getByRole('button', { name: '下一步' }))
+  await user.click(screen.getByRole('button', { name: '下一步' }))
+}
+
+function saveEmployees(employees: Employee[]) {
+  localStorage.setItem('work-schedule:employees', JSON.stringify(employees))
+}
+
+function makeEmployee(
+  id: string,
+  overrides: Partial<Omit<Employee, 'id' | 'name'>> = {},
+): Employee {
+  return {
+    id,
+    name: id,
+    isSupervisor: false,
+    isVeteran: false,
+    isPT: false,
+    isActive: true,
+    prevMonthLastShift: null,
+    ...overrides,
+  }
 }
 
 function makePreviousMonthSchedule(): MonthlySchedule {
