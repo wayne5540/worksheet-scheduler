@@ -61,6 +61,16 @@ npm run build
 npm run verify
 ```
 
+## Debug JSON 分析
+
+若要分析 app 內「匯出 Debug JSON」取得的排班狀態，可以執行：
+
+```bash
+npm run debug:analyze -- /path/to/work-schedule-debug.json
+```
+
+這個指令會使用專案內的 TypeScript 規則 validator 重新檢查匯出的月班表，列出可排人力摘要、啟用規則、產生時放寬的規則，以及目前班表實際違反的規則。
+
 ## GitHub Pages 部署
 
 本專案已加入 GitHub Actions workflow，push 到 `master` 後會建置並部署到 GitHub Pages：

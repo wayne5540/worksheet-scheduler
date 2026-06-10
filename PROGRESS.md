@@ -1,6 +1,6 @@
 # Development Progress
 
-Last updated: 2026-06-10
+Last updated: 2026-06-11
 
 ## Done
 
@@ -40,6 +40,7 @@ Last updated: 2026-06-10
 - [x] Added README instructions for installing, testing, and opening the app.
 - [x] Added a debug JSON export action for localStorage settings and IndexedDB schedules.
 - [x] Added GitHub Pages deployment through a GitHub Actions workflow.
+- [x] Added a `tsx`-powered debug JSON analyzer CLI for replaying exported schedules through the TypeScript validators.
 
 ## In Progress
 
@@ -81,3 +82,4 @@ Last updated: 2026-06-10
 - Step 5 review table now mirrors the PLAN header structure with special-day markers, date numbers, and weekday labels above the editable schedule cells.
 - Debug storage exports use schema version 1 and include parsed localStorage employee/rule settings plus all saved IndexedDB monthly schedules sorted by month.
 - GitHub Pages deploys from `master` through `.github/workflows/deploy-pages.yml`; the workflow rebuilds Vite with `--base=/worksheet-scheduler/` for the project Pages URL.
+- `tsx` is the standard local runner for TypeScript debug scripts; `npm run debug:analyze -- <debug-json>` reads exported storage snapshots and runs the saved schedules through the same rule validators used by the app.
