@@ -15,14 +15,15 @@ Last updated: 2026-06-10
 - [x] Added R01-R15 rule validator tests and pure validation functions for existing monthly schedules.
 - [x] Added localStorage and IndexedDB persistence tests with minimal persistence adapters.
 - [x] Added Excel export structure tests and a minimal `.xlsx` workbook builder.
+- [x] Added scheduling relaxation-loop tests and orchestration implementation.
 
 ## In Progress
 
-- [ ] Build the monthly scheduling UI workflow from `PLAN.md`.
+- [ ] Implement the actual backtracking / constraint propagation attempt scheduler.
 
 ## Todo
 
-No active todo items beyond the current UI workflow.
+- [ ] Build the monthly scheduling UI workflow from `PLAN.md`.
 
 ## Learnings
 
@@ -39,3 +40,4 @@ No active todo items beyond the current UI workflow.
 - Persistence uses `localStorage` for employee/rule settings and IndexedDB `monthlySchedules` keyed by `month` for monthly schedules; tests use `fake-indexeddb`.
 - Excel export uses `write-excel-file`; npm `xlsx@0.18.5` was checked and avoided because `npm audit` reports high severity advisories without a fix.
 - Excel export currently builds the workbook structure and Blob; styling and pixel-perfect matching against the supplied template remain future UI/export polish.
+- Scheduling orchestration now owns prefill and rule relaxation; the injected attempt scheduler is still the missing search/backtracking component.
