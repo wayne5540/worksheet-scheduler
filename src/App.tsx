@@ -315,6 +315,21 @@ function App() {
     void scheduleStore.saveSchedule(nextSchedule)
   }
 
+  async function clearCurrentSchedule() {
+    if (!schedule) {
+      return
+    }
+
+    if (!window.confirm(`確定清除 ${schedule.month} 班表？`)) {
+      return
+    }
+
+    await scheduleStore.deleteSchedule(schedule.month)
+    setSchedule(null)
+    setGenerationMessage(null)
+    setCurrentStep(1)
+  }
+
   function updateMonthConstraints(nextConstraints: PersonalConstraint[]) {
     setConstraints((currentConstraints) => [
       ...currentConstraints.filter((constraint) => constraint.month !== month),
@@ -501,6 +516,7 @@ function App() {
           lockedEntries={entriesForMonth(lockedEntries, month)}
           manualSpecialDays={manualSpecialDays}
           month={month}
+          onClearSchedule={clearCurrentSchedule}
           onGenerate={generateSchedule}
           onMonthChange={setMonth}
           onPrevFourWeekDateChange={setPrevFourWeekDate}
@@ -857,6 +873,7 @@ interface MonthlyWorkspaceProps {
   manualSpecialDays: SpecialDay[]
   month: MonthString
   onGenerate: () => void | Promise<void>
+  onClearSchedule: () => void | Promise<void>
   onMonthChange: (month: MonthString) => void
   onPrevFourWeekDateChange: (date: DateString) => void
   onRegenerate: () => void | Promise<void>
@@ -883,6 +900,7 @@ function MonthlyWorkspace({
   lockedEntries,
   manualSpecialDays,
   month,
+  onClearSchedule,
   onGenerate,
   onMonthChange,
   onPrevFourWeekDateChange,
@@ -965,6 +983,7 @@ function MonthlyWorkspace({
           <StepFive
             activeRules={activeRules}
             employees={employees}
+            onClearSchedule={onClearSchedule}
             onRegenerate={onRegenerate}
             onScheduleChange={onScheduleChange}
             schedule={schedule}
@@ -1336,12 +1355,14 @@ function StepFour({
 function StepFive({
   activeRules,
   employees,
+  onClearSchedule,
   onRegenerate,
   onScheduleChange,
   schedule,
 }: {
   activeRules: RuleDefinition[]
   employees: Employee[]
+  onClearSchedule: () => void | Promise<void>
   onRegenerate: () => void | Promise<void>
   onScheduleChange: (schedule: MonthlySchedule) => void
   schedule: MonthlySchedule
@@ -1419,6 +1440,9 @@ function StepFive({
         </button>
         <button onClick={() => void exportExcel()} type="button">
           匯出 Excel
+        </button>
+        <button onClick={() => void onClearSchedule()} type="button">
+          清除本月班表
         </button>
       </div>
       {schedule.relaxedRules.length > 0 && (

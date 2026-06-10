@@ -239,6 +239,31 @@ describe('App', () => {
     expect(screen.getByRole('table', { name: '班表檢視' })).toBeInTheDocument()
   })
 
+  it('clears a saved monthly schedule when requested', async () => {
+    const user = userEvent.setup()
+    const confirmClear = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const { unmount } = render(<App />)
+
+    await generateVisibleSchedule(user)
+    await user.click(screen.getByRole('button', { name: '清除本月班表' }))
+
+    expect(confirmClear).toHaveBeenCalledWith('確定清除 2026-06 班表？')
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: 'Step 1：月份設定' }),
+      ).toBeInTheDocument(),
+    )
+
+    unmount()
+    render(<App />)
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: 'Step 1：月份設定' }),
+      ).toBeInTheDocument(),
+    )
+  })
+
   it('edits monthly carry-in, special days, and personal constraints', async () => {
     const user = userEvent.setup()
 

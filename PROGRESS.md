@@ -36,6 +36,7 @@ Last updated: 2026-06-10
 - [x] Added Step 3 locked `特` / `公` leave entries before generation.
 - [x] Added drag-and-drop ordering for employees and rules.
 - [x] Added type-specific Step 2 special-day color states.
+- [x] Added user-triggered clearing for saved monthly schedules.
 
 ## In Progress
 
