@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Employee, ScheduleEntry } from '../domain/model'
 import { DEFAULT_RULES } from '../domain/rules'
 import {
+  attemptBacktrackingSchedule,
   prefillLockedEntries,
   runRelaxedScheduling,
   type AttemptSchedule,
+  type AttemptScheduleInput,
   type ScheduleRequest,
 } from './scheduler'
 
@@ -116,6 +118,71 @@ describe('scheduler orchestration', () => {
     expect(attemptSchedule).toHaveBeenCalledTimes(2)
     expect(attemptSchedule.mock.calls[1][0].activeRules).toEqual([])
   })
+
+  it('attemptBacktrackingSchedule fills missing entries while preserving prefilled forced leave', () => {
+    const request = makeRequest({
+      constraints: [
+        {
+          employeeId: 'emp-1',
+          month: '2026-06',
+          forcedDaysOff: ['2026-06-03'],
+        },
+      ],
+      rules: DEFAULT_RULES.filter((rule) => rule.id === 'R01'),
+    })
+    const result = attemptBacktrackingSchedule(makeAttemptInput(request))
+
+    expect(result.success).toBe(true)
+
+    if (result.success) {
+      expect(result.entries).toHaveLength(30)
+      expect(
+        result.entries.find(
+          (entry) =>
+            entry.employeeId === 'emp-1' && entry.date === '2026-06-03',
+        ),
+      ).toMatchObject({ shift: '休' })
+    }
+  })
+
+  it('attemptBacktrackingSchedule avoids a cross-month late-to-early violation', () => {
+    const request = makeRequest({
+      employees: [{ ...employees[0], prevMonthLastShift: 'F13' }],
+      rules: DEFAULT_RULES.filter((rule) => rule.id === 'R09'),
+    })
+    const result = attemptBacktrackingSchedule(makeAttemptInput(request))
+
+    expect(result.success).toBe(true)
+
+    if (result.success) {
+      expect(
+        result.entries.find(
+          (entry) =>
+            entry.employeeId === 'emp-1' && entry.date === '2026-06-01',
+        ),
+      ).toMatchObject({ shift: 'F13' })
+    }
+  })
+
+  it('attemptBacktrackingSchedule reports conflicts that cannot overwrite locked leave', () => {
+    const request = makeRequest({
+      constraints: [
+        {
+          employeeId: 'emp-1',
+          month: '2026-06',
+          forcedDaysOff: ['2026-06-03'],
+        },
+      ],
+      lockedEntries: [makeEntry('emp-1', '2026-06-03', '特')],
+      rules: DEFAULT_RULES.filter((rule) => rule.id === 'R01'),
+    })
+
+    expect(attemptBacktrackingSchedule(makeAttemptInput(request))).toEqual({
+      success: false,
+      conflictDates: ['2026-06-03'],
+      reason: '無法產生符合目前規則的班表',
+    })
+  })
 })
 
 function makeRequest(
@@ -131,6 +198,14 @@ function makeRequest(
     lockedEntries: [],
     rules: DEFAULT_RULES,
     ...overrides,
+  }
+}
+
+function makeAttemptInput(request: ScheduleRequest): AttemptScheduleInput {
+  return {
+    ...request,
+    activeRules: request.rules ?? DEFAULT_RULES,
+    prefilledEntries: prefillLockedEntries(request),
   }
 }
 

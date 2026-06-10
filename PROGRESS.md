@@ -16,14 +16,15 @@ Last updated: 2026-06-10
 - [x] Added localStorage and IndexedDB persistence tests with minimal persistence adapters.
 - [x] Added Excel export structure tests and a minimal `.xlsx` workbook builder.
 - [x] Added scheduling relaxation-loop tests and orchestration implementation.
+- [x] Added a minimal deterministic attempt scheduler with prefill preservation, R09 pruning, and final validator checks.
 
 ## In Progress
 
-- [ ] Implement the actual backtracking / constraint propagation attempt scheduler.
+- [ ] Build the monthly scheduling UI workflow from `PLAN.md`.
 
 ## Todo
 
-- [ ] Build the monthly scheduling UI workflow from `PLAN.md`.
+- [ ] Expand attempt scheduler constraint propagation and performance coverage for realistic full-month R01-R15 staffing.
 
 ## Learnings
 
@@ -40,4 +41,5 @@ Last updated: 2026-06-10
 - Persistence uses `localStorage` for employee/rule settings and IndexedDB `monthlySchedules` keyed by `month` for monthly schedules; tests use `fake-indexeddb`.
 - Excel export uses `write-excel-file`; npm `xlsx@0.18.5` was checked and avoided because `npm audit` reports high severity advisories without a fix.
 - Excel export currently builds the workbook structure and Blob; styling and pixel-perfect matching against the supplied template remain future UI/export polish.
-- Scheduling orchestration now owns prefill and rule relaxation; the injected attempt scheduler is still the missing search/backtracking component.
+- Scheduling orchestration now owns prefill and rule relaxation; `attemptBacktrackingSchedule` provides the first injected search implementation.
+- The first attempt scheduler is intentionally small: it fills missing cells deterministically, prunes R09 late-to-early candidates, and relies on validators for final acceptance; it still needs stronger constraint propagation for realistic rosters.
