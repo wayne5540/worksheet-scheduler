@@ -11,14 +11,14 @@ Last updated: 2026-06-10
 - [x] Added versioned git hooks for commit message, progress, symlink, and verification enforcement.
 - [x] Added the initial React + TypeScript + Vite TDD toolchain.
 - [x] Scaffolded the first app shell without implementing business scheduling logic.
+- [x] Added domain model tests and pure domain utilities for employees, shift types, special days, and four-week cycle calculations.
 
 ## In Progress
 
-- [ ] Add domain model tests for employees, shift types, special days, and four-week cycle calculations.
+- [ ] Add rule validator tests before implementing R01-R15.
 
 ## Todo
 
-- [ ] Add rule validator tests before implementing R01-R15.
 - [ ] Add IndexedDB/localStorage persistence tests before persistence implementation.
 - [ ] Add Excel export structure tests before export implementation.
 - [ ] Build the monthly scheduling UI workflow from `PLAN.md`.
@@ -32,3 +32,4 @@ Last updated: 2026-06-10
 - `@vitejs/plugin-react` peer dependencies for React Compiler support are optional in the current package metadata, so the setup uses the official Vite React plugin.
 - `PLAN.md` now explicitly includes `國A` because the rules convert holiday store-meeting late shifts from `國13` to `國A`; domain code should treat it as a holiday late/work shift.
 - Four-week carry-in is required when `prevFourWeekDate + 1` is before the current month, because the cycle start date determines whether the first R02 audit period crosses month boundaries.
+- Pure date calculations use UTC `Date` values internally and expose `YYYY-MM-DD` strings at module boundaries to avoid local timezone drift in schedule rules.
