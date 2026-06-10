@@ -20,14 +20,14 @@ Last updated: 2026-06-10
 - [x] Added the first monthly scheduling UI workflow with stepper navigation, schedule generation, review table, and export action wiring.
 - [x] Wired employee and rule setting UI state to `localStorage` with editable employee rows and rule enable toggles.
 - [x] Persisted generated monthly schedules to IndexedDB and reload them by month in the UI.
+- [x] Added manual schedule cell editing, violation highlighting, and saved export download flow.
 
 ## In Progress
 
-- [ ] Add manual schedule cell editing, violation highlighting, and saved export download flow.
+- [ ] Expand attempt scheduler constraint propagation and performance coverage for realistic full-month R01-R15 staffing.
 
 ## Todo
 
-- [ ] Expand attempt scheduler constraint propagation and performance coverage for realistic full-month R01-R15 staffing.
 - [ ] Replace remaining seeded monthly demo defaults with fully editable month setup records.
 
 ## Learnings
@@ -50,3 +50,4 @@ Last updated: 2026-06-10
 - The first UI workflow uses seeded employees and generates with the currently tractable R01/R09 rule subset so the stepper can exercise real scheduling/export plumbing without blocking on the full solver.
 - Employee and rule settings in the UI now use `LocalStorageSettingsStore`; generated monthly schedules use `IndexedDbScheduleStore`.
 - Generated schedules are saved through `IndexedDbScheduleStore` after successful generation; App reloads a saved month into Step 5 when available.
+- Step 5 uses editable shift selects for visible schedule cells, saves manual edits back to IndexedDB, validates with the active rule list, and downloads Excel exports through a temporary object URL.

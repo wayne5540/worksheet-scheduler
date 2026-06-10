@@ -1,16 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { calculateFourWeekNodes } from './domain/fourWeekCycle'
-import type {
-  DateString,
-  Employee,
-  MonthString,
-  MonthlySchedule,
-  PersonalConstraint,
-  SpecialDay,
-  ShiftType,
+import {
+  SHIFT_TYPES,
+  type DateString,
+  type Employee,
+  type MonthString,
+  type MonthlySchedule,
+  type PersonalConstraint,
+  type ScheduleEntry,
+  type SpecialDay,
+  type ShiftType,
 } from './domain/model'
-import { DEFAULT_RULES } from './domain/rules'
+import {
+  DEFAULT_RULES,
+  validateRules,
+  type RuleDefinition,
+  type RuleViolation,
+} from './domain/rules'
 import {
   buildScheduleWorkbook,
   createScheduleWorkbookBlob,
@@ -170,6 +177,11 @@ function App() {
     }
   }, [month, scheduleStore])
 
+  function updateSchedule(nextSchedule: MonthlySchedule) {
+    setSchedule(nextSchedule)
+    void scheduleStore.saveSchedule(nextSchedule)
+  }
+
   async function generateSchedule() {
     setGenerationMessage('產生中')
 
@@ -278,6 +290,7 @@ function App() {
       )}
       {activeTab === '月度排班' && (
         <MonthlyWorkspace
+          activeRules={activeRules}
           constraints={constraints}
           currentStep={currentStep}
           employees={employees}
@@ -288,6 +301,7 @@ function App() {
           onGenerate={generateSchedule}
           onMonthChange={setMonth}
           onPrevFourWeekDateChange={setPrevFourWeekDate}
+          onScheduleChange={updateSchedule}
           onSetConstraints={setConstraints}
           onSetCurrentStep={setCurrentStep}
           onSetManualSpecialDays={setManualSpecialDays}
@@ -509,6 +523,7 @@ function RuleWorkspace({
 }
 
 interface MonthlyWorkspaceProps {
+  activeRules: RuleDefinition[]
   constraints: PersonalConstraint[]
   currentStep: number
   employees: Employee[]
@@ -519,6 +534,7 @@ interface MonthlyWorkspaceProps {
   onGenerate: () => void | Promise<void>
   onMonthChange: (month: MonthString) => void
   onPrevFourWeekDateChange: (date: DateString) => void
+  onScheduleChange: (schedule: MonthlySchedule) => void
   onSetConstraints: (constraints: PersonalConstraint[]) => void
   onSetCurrentStep: (step: number) => void
   onSetManualSpecialDays: (specialDays: SpecialDay[]) => void
@@ -528,6 +544,7 @@ interface MonthlyWorkspaceProps {
 }
 
 function MonthlyWorkspace({
+  activeRules,
   constraints,
   currentStep,
   employees,
@@ -538,6 +555,7 @@ function MonthlyWorkspace({
   onGenerate,
   onMonthChange,
   onPrevFourWeekDateChange,
+  onScheduleChange,
   onSetConstraints,
   onSetCurrentStep,
   onSetManualSpecialDays,
@@ -597,7 +615,12 @@ function MonthlyWorkspace({
           />
         )}
         {currentStep === 5 && schedule && (
-          <StepFive employees={employees} schedule={schedule} />
+          <StepFive
+            activeRules={activeRules}
+            employees={employees}
+            onScheduleChange={onScheduleChange}
+            schedule={schedule}
+          />
         )}
       </div>
 
@@ -769,29 +792,97 @@ function StepFour({
 }
 
 function StepFive({
+  activeRules,
   employees,
+  onScheduleChange,
   schedule,
 }: {
+  activeRules: RuleDefinition[]
   employees: Employee[]
+  onScheduleChange: (schedule: MonthlySchedule) => void
   schedule: MonthlySchedule
 }) {
+  const [violations, setViolations] = useState<RuleViolation[]>([])
   const visibleDates = datesInMonth(schedule.month).slice(0, 5)
+  const invalidCellKeys = buildInvalidCellKeys(violations, employees)
 
   async function exportExcel() {
     const workbook = buildScheduleWorkbook(schedule, employees)
+    const blob = await createScheduleWorkbookBlob(workbook)
 
-    await createScheduleWorkbookBlob(workbook)
+    downloadBlob(blob, workbook.fileName)
+  }
+
+  function validateSchedule() {
+    setViolations(
+      validateRules(
+        {
+          employees,
+          month: schedule.month,
+          prevFourWeekDate: schedule.prevFourWeekDate,
+          cycleCarryIn: schedule.cycleCarryIn,
+          specialDays: schedule.specialDays,
+          constraints: schedule.constraints,
+          entries: schedule.entries,
+        },
+        activeRules,
+      ),
+    )
+  }
+
+  function updateShift(employeeId: string, date: DateString, shift: ShiftType) {
+    const updatedEntry = {
+      employeeId,
+      date,
+      shift,
+      isAutoRelaxed: false,
+      isManualEdit: true,
+    } satisfies ScheduleEntry
+    const hasExistingEntry = schedule.entries.some(
+      (entry) => entry.employeeId === employeeId && entry.date === date,
+    )
+    const entries = hasExistingEntry
+      ? schedule.entries.map((entry) =>
+          entry.employeeId === employeeId && entry.date === date
+            ? {
+                ...entry,
+                shift,
+                isAutoRelaxed: false,
+                isManualEdit: true,
+              }
+            : entry,
+        )
+      : [...schedule.entries, updatedEntry]
+
+    setViolations([])
+    onScheduleChange({
+      ...schedule,
+      entries,
+    })
   }
 
   return (
     <>
       <div className="toolbar">
-        <button type="button">驗證</button>
+        <button onClick={validateSchedule} type="button">
+          驗證
+        </button>
         <button type="button">重新產生</button>
         <button onClick={() => void exportExcel()} type="button">
           匯出 Excel
         </button>
       </div>
+      {violations.length > 0 && (
+        <div aria-label="違規清單" className="validationSummary" role="status">
+          <ul>
+            {violations.map((violation) => (
+              <li key={`${violation.ruleId}-${violation.dates.join('-')}`}>
+                {violation.ruleId} {violation.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="scheduleFrame">
         <table aria-label="班表檢視">
           <caption>班表檢視</caption>
@@ -811,11 +902,35 @@ function StepFive({
               <tr key={employee.id}>
                 <th scope="row">{employee.name}</th>
                 <td>{employee.prevMonthLastShift ?? '-'}</td>
-                {visibleDates.map((date) => (
-                  <td key={date}>
-                    {shiftFor(schedule, employee.id, date) ?? '-'}
-                  </td>
-                ))}
+                {visibleDates.map((date) => {
+                  const entry = entryFor(schedule, employee.id, date)
+                  const isInvalid = invalidCellKeys.has(
+                    cellKey(employee.id, date),
+                  )
+
+                  return (
+                    <td className={cellClassName(entry, isInvalid)} key={date}>
+                      <select
+                        aria-invalid={isInvalid ? 'true' : undefined}
+                        aria-label={`${employee.name} ${date} 班別`}
+                        onChange={(event) =>
+                          updateShift(
+                            employee.id,
+                            date,
+                            event.currentTarget.value as ShiftType,
+                          )
+                        }
+                        value={entry?.shift ?? ''}
+                      >
+                        {SHIFT_TYPES.map((shift) => (
+                          <option key={shift} value={shift}>
+                            {shift}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  )
+                })}
               </tr>
             ))}
           </tbody>
@@ -844,14 +959,75 @@ function WorkspaceTitle({
   )
 }
 
-function shiftFor(
+function buildInvalidCellKeys(
+  violations: RuleViolation[],
+  employees: Employee[],
+): Set<string> {
+  const keys = new Set<string>()
+  const visibleEmployeeIds = employees.map((employee) => employee.id)
+
+  for (const violation of violations) {
+    const affectedEmployeeIds =
+      violation.employeeIds.length > 0
+        ? violation.employeeIds
+        : visibleEmployeeIds
+
+    for (const employeeId of affectedEmployeeIds) {
+      for (const date of violation.dates) {
+        keys.add(cellKey(employeeId, date))
+      }
+    }
+  }
+
+  return keys
+}
+
+function cellKey(employeeId: string, date: DateString): string {
+  return `${employeeId}:${date}`
+}
+
+function cellClassName(
+  entry: ScheduleEntry | undefined,
+  isInvalid: boolean,
+): string | undefined {
+  const classNames: string[] = []
+
+  if (entry?.isAutoRelaxed) {
+    classNames.push('autoRelaxedCell')
+  }
+
+  if (entry?.isManualEdit) {
+    classNames.push('manualEditCell')
+  }
+
+  if (isInvalid) {
+    classNames.push('violationCell')
+  }
+
+  return classNames.length > 0 ? classNames.join(' ') : undefined
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = url
+  link.download = fileName
+  link.style.display = 'none'
+  document.body.append(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+function entryFor(
   schedule: MonthlySchedule,
   employeeId: string,
   date: DateString,
 ) {
   return schedule.entries.find(
     (entry) => entry.employeeId === employeeId && entry.date === date,
-  )?.shift
+  )
 }
 
 function datesInMonth(month: MonthString): DateString[] {

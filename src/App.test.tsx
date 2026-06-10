@@ -1,12 +1,16 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
 
 describe('App', () => {
   beforeEach(() => {
     localStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('renders the monthly scheduling stepper with calculated four-week nodes', () => {
@@ -151,6 +155,73 @@ describe('App', () => {
       ).toBeInTheDocument(),
     )
     expect(screen.getByRole('table', { name: '班表檢視' })).toBeInTheDocument()
+  })
+
+  it('persists manual schedule cell edits in IndexedDB', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<App />)
+
+    await generateVisibleSchedule(user)
+    await user.selectOptions(
+      screen.getByLabelText('主管 2026-06-01 班別'),
+      '例',
+    )
+
+    expect(screen.getByLabelText('主管 2026-06-01 班別')).toHaveValue('例')
+
+    unmount()
+    render(<App />)
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('主管 2026-06-01 班別')).toBeInTheDocument(),
+    )
+    expect(screen.getByLabelText('主管 2026-06-01 班別')).toHaveValue('例')
+  })
+
+  it('validates manual edits and highlights violating schedule cells', async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await generateVisibleSchedule(user)
+    await user.selectOptions(
+      screen.getByLabelText('一般員工 2026-06-01 班別'),
+      'F05',
+    )
+    await user.click(screen.getByRole('button', { name: '驗證' }))
+
+    expect(screen.getByLabelText('一般員工 2026-06-01 班別')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
+    expect(screen.getByText('R09 晚班隔天不得排早班')).toBeInTheDocument()
+  })
+
+  it('downloads the generated schedule workbook from the export action', async () => {
+    const user = userEvent.setup()
+    const createObjectUrl = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:workbook')
+    const revokeObjectUrl = vi
+      .spyOn(URL, 'revokeObjectURL')
+      .mockImplementation(() => undefined)
+    const clickAnchor = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined)
+
+    render(<App />)
+
+    await generateVisibleSchedule(user)
+    await user.click(screen.getByRole('button', { name: '匯出 Excel' }))
+
+    await waitFor(() => expect(createObjectUrl).toHaveBeenCalled())
+    const clickedAnchor = clickAnchor.mock.instances[0] as HTMLAnchorElement
+
+    expect(createObjectUrl).toHaveBeenCalledWith(expect.any(Blob))
+    expect(clickAnchor).toHaveBeenCalled()
+    expect(clickedAnchor.download).toBe('排班_2026年6月.xlsx')
+    expect(clickedAnchor.href).toBe('blob:workbook')
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:workbook')
   })
 })
 

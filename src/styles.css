@@ -25,7 +25,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -131,6 +132,17 @@ input {
   border: 1px solid #b8c3bd;
   border-radius: 8px;
   padding: 0 12px;
+  color: #24312f;
+  background: #ffffff;
+}
+
+select {
+  min-height: 36px;
+  width: 100%;
+  min-width: 72px;
+  border: 1px solid #b8c3bd;
+  border-radius: 6px;
+  padding: 0 8px;
   color: #24312f;
   background: #ffffff;
 }
@@ -300,6 +312,37 @@ th {
 
 td {
   color: #586660;
+}
+
+.autoRelaxedCell {
+  background: #fff4cf;
+}
+
+.manualEditCell {
+  background: #dceeff;
+}
+
+.violationCell {
+  outline: 2px solid #bd3f32;
+  outline-offset: -2px;
+}
+
+.violationCell select {
+  border-color: #bd3f32;
+}
+
+.validationSummary {
+  margin: 0 0 14px;
+  border: 1px solid #e0aaa3;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #7a2b23;
+  background: #fff0ee;
+}
+
+.validationSummary ul {
+  margin: 0;
+  padding-left: 20px;
 }
 
 @media (max-width: 720px) {
