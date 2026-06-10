@@ -154,6 +154,29 @@ describe('App', () => {
     expect(screen.getByLabelText('R15 啟用')).toBeChecked()
   })
 
+  it('reorders employees and rule priorities', async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await user.click(screen.getByRole('tab', { name: '員工管理' }))
+    await user.click(screen.getByRole('button', { name: '員工 2 上移' }))
+
+    expect(screen.getByLabelText('員工 1 姓名')).toHaveValue('老手')
+
+    await user.click(screen.getByRole('tab', { name: '規則設定' }))
+    await user.click(screen.getByRole('button', { name: 'R02 上移' }))
+
+    expect(
+      JSON.parse(localStorage.getItem('work-schedule:rule-settings') ?? '[]'),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ ruleId: 'R02', priority: 1 }),
+        expect.objectContaining({ ruleId: 'R01', priority: 2 }),
+      ]),
+    )
+  })
+
   it('persists generated monthly schedules in IndexedDB and reloads the month', async () => {
     const user = userEvent.setup()
     const { unmount } = render(<App />)

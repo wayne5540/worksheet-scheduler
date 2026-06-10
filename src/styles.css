@@ -187,6 +187,16 @@ button:disabled {
   background: #e7f0eb;
 }
 
+.inlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.inlineActions .textButton {
+  min-height: 30px;
+}
+
 .stepper {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

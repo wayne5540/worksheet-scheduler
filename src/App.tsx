@@ -199,6 +199,18 @@ function App() {
     ])
   }
 
+  function moveEmployee(employeeId: string, direction: -1 | 1) {
+    setEmployees((currentEmployees) =>
+      moveEmployeeById(currentEmployees, employeeId, direction),
+    )
+  }
+
+  function moveRuleSetting(ruleId: RuleSetting['ruleId'], direction: -1 | 1) {
+    setRuleSettings((currentSettings) =>
+      moveRuleSettingById(currentSettings, ruleId, direction),
+    )
+  }
+
   async function generateSchedule() {
     setGenerationMessage('產生中')
 
@@ -277,6 +289,7 @@ function App() {
               currentEmployees.filter((employee) => employee.id !== employeeId),
             )
           }
+          onMoveEmployee={moveEmployee}
           onUpdateEmployee={(employeeId, patch) =>
             setEmployees((currentEmployees) =>
               currentEmployees.map((employee) =>
@@ -291,6 +304,7 @@ function App() {
       {activeTab === '規則設定' && (
         <RuleWorkspace
           onRestoreDefaults={() => setRuleSettings(defaultRuleSettings())}
+          onMoveRuleSetting={moveRuleSetting}
           onUpdateRuleSetting={(ruleId, patch) =>
             setRuleSettings((currentSettings) =>
               currentSettings.map((setting) =>
@@ -333,11 +347,13 @@ function EmployeeWorkspace({
   employees,
   onAddEmployee,
   onDeleteEmployee,
+  onMoveEmployee,
   onUpdateEmployee,
 }: {
   employees: Employee[]
   onAddEmployee: () => void
   onDeleteEmployee: (employeeId: string) => void
+  onMoveEmployee: (employeeId: string, direction: -1 | 1) => void
   onUpdateEmployee: (employeeId: string, patch: Partial<Employee>) => void
 }) {
   return (
@@ -363,6 +379,7 @@ function EmployeeWorkspace({
               <th scope="col">PT</th>
               <th scope="col">啟用</th>
               <th scope="col">前月末班</th>
+              <th scope="col">順序</th>
               <th scope="col">操作</th>
             </tr>
           </thead>
@@ -449,6 +466,28 @@ function EmployeeWorkspace({
                   </select>
                 </td>
                 <td>
+                  <div className="inlineActions">
+                    <button
+                      aria-label={`員工 ${index + 1} 上移`}
+                      className="textButton"
+                      disabled={index === 0}
+                      onClick={() => onMoveEmployee(employee.id, -1)}
+                      type="button"
+                    >
+                      上移
+                    </button>
+                    <button
+                      aria-label={`員工 ${index + 1} 下移`}
+                      className="textButton"
+                      disabled={index === employees.length - 1}
+                      onClick={() => onMoveEmployee(employee.id, 1)}
+                      type="button"
+                    >
+                      下移
+                    </button>
+                  </div>
+                </td>
+                <td>
                   <button
                     className="textButton"
                     onClick={() => {
@@ -471,10 +510,12 @@ function EmployeeWorkspace({
 }
 
 function RuleWorkspace({
+  onMoveRuleSetting,
   onRestoreDefaults,
   onUpdateRuleSetting,
   ruleSettings,
 }: {
+  onMoveRuleSetting: (ruleId: RuleSetting['ruleId'], direction: -1 | 1) => void
   onRestoreDefaults: () => void
   onUpdateRuleSetting: (
     ruleId: RuleSetting['ruleId'],
@@ -507,15 +548,38 @@ function RuleWorkspace({
               <th scope="col">Priority</th>
               <th scope="col">規則 ID</th>
               <th scope="col">規則名稱</th>
+              <th scope="col">順序</th>
               <th scope="col">啟用</th>
             </tr>
           </thead>
           <tbody>
-            {rules.map((rule) => (
+            {rules.map((rule, index) => (
               <tr key={rule.id}>
                 <td>{rule.priority}</td>
                 <th scope="row">{rule.id}</th>
                 <td>{rule.name}</td>
+                <td>
+                  <div className="inlineActions">
+                    <button
+                      aria-label={`${rule.id} 上移`}
+                      className="textButton"
+                      disabled={index === 0}
+                      onClick={() => onMoveRuleSetting(rule.id, -1)}
+                      type="button"
+                    >
+                      上移
+                    </button>
+                    <button
+                      aria-label={`${rule.id} 下移`}
+                      className="textButton"
+                      disabled={index === rules.length - 1}
+                      onClick={() => onMoveRuleSetting(rule.id, 1)}
+                      type="button"
+                    >
+                      下移
+                    </button>
+                  </div>
+                </td>
                 <td>
                   <input
                     aria-label={`${rule.id} 啟用`}
@@ -1314,6 +1378,57 @@ function normalizeCycleCarryIn(
       }
     )
   })
+}
+
+function moveEmployeeById(
+  employees: Employee[],
+  employeeId: string,
+  direction: -1 | 1,
+): Employee[] {
+  const currentIndex = employees.findIndex(
+    (employee) => employee.id === employeeId,
+  )
+  const targetIndex = currentIndex + direction
+
+  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= employees.length) {
+    return employees
+  }
+
+  const nextEmployees = [...employees]
+  const [movedEmployee] = nextEmployees.splice(currentIndex, 1)
+  nextEmployees.splice(targetIndex, 0, movedEmployee)
+
+  return nextEmployees
+}
+
+function moveRuleSettingById(
+  ruleSettings: RuleSetting[],
+  ruleId: RuleSetting['ruleId'],
+  direction: -1 | 1,
+): RuleSetting[] {
+  const orderedSettings = [...ruleSettings].sort(
+    (left, right) => left.priority - right.priority,
+  )
+  const currentIndex = orderedSettings.findIndex(
+    (setting) => setting.ruleId === ruleId,
+  )
+  const targetIndex = currentIndex + direction
+
+  if (
+    currentIndex < 0 ||
+    targetIndex < 0 ||
+    targetIndex >= orderedSettings.length
+  ) {
+    return ruleSettings
+  }
+
+  const [movedSetting] = orderedSettings.splice(currentIndex, 1)
+  orderedSettings.splice(targetIndex, 0, movedSetting)
+
+  return orderedSettings.map((setting, index) => ({
+    ...setting,
+    priority: index + 1,
+  }))
 }
 
 function requiresCarryIn(
