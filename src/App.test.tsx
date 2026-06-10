@@ -261,11 +261,21 @@ describe('App', () => {
       screen.getByRole('button', { name: '2026-06-10 假日' }),
     ).toHaveAttribute('aria-pressed', 'true')
     expect(
+      screen.getByRole('button', { name: '2026-06-10 假日' }),
+    ).toHaveClass('holidayButton')
+    expect(
       screen.getByRole('button', { name: '2026-06-10 店務' }),
     ).toHaveAttribute('aria-pressed', 'false')
     expect(
+      screen.getByRole('button', { name: '2026-06-10 店務' }),
+    ).toHaveClass('storeButton')
+    expect(
       screen.getByRole('button', { name: '2026-06-10 大清' }),
     ).toHaveAttribute('aria-pressed', 'true')
+    expect(
+      screen.getByRole('button', { name: '2026-06-10 大清' }),
+    ).toHaveClass('deepCleanButton')
+    expect(screen.getByText('2026-06-12 四周')).toHaveClass('fourWeekMarker')
 
     await user.click(screen.getByRole('button', { name: '下一步' }))
     await user.click(

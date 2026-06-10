@@ -302,6 +302,32 @@ button:disabled {
   border-color: #bd3f32;
 }
 
+.dayButton.selected.holidayButton,
+.marker.holidayButton {
+  color: #ffffff;
+  background: #bd3f32;
+  border-color: #bd3f32;
+}
+
+.dayButton.selected.storeButton,
+.marker.storeButton {
+  color: #ffffff;
+  background: #b96a18;
+  border-color: #b96a18;
+}
+
+.dayButton.selected.deepCleanButton,
+.marker.deepCleanButton {
+  color: #ffffff;
+  background: #2f6f99;
+  border-color: #2f6f99;
+}
+
+.marker.fourWeekMarker {
+  color: #33423f;
+  background: #dfe4e1;
+}
+
 .setupTable {
   margin-top: 16px;
 }

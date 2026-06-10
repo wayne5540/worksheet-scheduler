@@ -35,6 +35,7 @@ Last updated: 2026-06-10
 - [x] Added Step 4 loading state while schedule generation is running.
 - [x] Added Step 3 locked `特` / `公` leave entries before generation.
 - [x] Added drag-and-drop ordering for employees and rules.
+- [x] Added type-specific Step 2 special-day color states.
 
 ## In Progress
 

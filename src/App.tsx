@@ -1149,7 +1149,7 @@ function StepTwo({
                   key={type}
                   aria-label={`${date} ${type}`}
                   aria-pressed={isSelected}
-                  className={isSelected ? 'dayButton selected' : 'dayButton'}
+                  className={specialDayButtonClassName(type, isSelected)}
                   onClick={() =>
                     onSetManualSpecialDays(
                       toggleSpecialDay(manualSpecialDays, date, type),
@@ -1165,7 +1165,10 @@ function StepTwo({
         )
       })}
       {specialDays.map((day) => (
-        <span className="marker" key={`${day.date}-${day.type}`}>
+        <span
+          className={`marker ${specialDayTypeClassName(day.type)}`}
+          key={`${day.date}-${day.type}`}
+        >
           {day.date} {day.type}
         </span>
       ))}
@@ -1993,6 +1996,32 @@ function toggleForcedDayOff(
       forcedDaysOff,
     },
   ]
+}
+
+function specialDayButtonClassName(
+  type: Exclude<SpecialDay['type'], '四周'>,
+  isSelected: boolean,
+): string {
+  return [
+    'dayButton',
+    specialDayTypeClassName(type),
+    isSelected ? 'selected' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+function specialDayTypeClassName(type: SpecialDay['type']): string {
+  switch (type) {
+    case '假日':
+      return 'holidayButton'
+    case '店務':
+      return 'storeButton'
+    case '大清':
+      return 'deepCleanButton'
+    case '四周':
+      return 'fourWeekMarker'
+  }
 }
 
 function removeForcedDayOff(
