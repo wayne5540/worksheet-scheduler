@@ -38,6 +38,8 @@ Last updated: 2026-06-10
 - [x] Added type-specific Step 2 special-day color states.
 - [x] Added user-triggered clearing for saved monthly schedules.
 - [x] Added README instructions for installing, testing, and opening the app.
+- [x] Added a debug JSON export action for localStorage settings and IndexedDB schedules.
+- [x] Added GitHub Pages deployment through a GitHub Actions workflow.
 
 ## In Progress
 
@@ -77,3 +79,5 @@ Last updated: 2026-06-10
 - Rule descriptions now live on `RuleDefinition`, and Step 5 surfaces relaxed rules from saved schedules while `重新產生` reruns scheduling and overwrites manual edits.
 - Previous-month last shifts are loaded from the saved schedule's final date into matching employee records, including holiday shift types such as `國A`.
 - Step 5 review table now mirrors the PLAN header structure with special-day markers, date numbers, and weekday labels above the editable schedule cells.
+- Debug storage exports use schema version 1 and include parsed localStorage employee/rule settings plus all saved IndexedDB monthly schedules sorted by month.
+- GitHub Pages deploys from `master` through `.github/workflows/deploy-pages.yml`; the workflow rebuilds Vite with `--base=/worksheet-scheduler/` for the project Pages URL.

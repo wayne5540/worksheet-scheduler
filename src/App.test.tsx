@@ -545,6 +545,53 @@ describe('App', () => {
     expect(clickedAnchor.href).toBe('blob:workbook')
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:workbook')
   })
+
+  it('downloads a debug storage export as JSON', async () => {
+    const user = userEvent.setup()
+    const debugEmployee = makeEmployee('debug-emp', {
+      isSupervisor: true,
+      isVeteran: true,
+    })
+    const scheduleStore = new IndexedDbScheduleStore()
+    const createObjectUrl = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:debug-export')
+    const revokeObjectUrl = vi
+      .spyOn(URL, 'revokeObjectURL')
+      .mockImplementation(() => undefined)
+    const clickAnchor = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined)
+
+    saveEmployees([debugEmployee])
+    await scheduleStore.saveSchedule(makePreviousMonthSchedule())
+
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '匯出 Debug JSON' }))
+
+    await waitFor(() => expect(createObjectUrl).toHaveBeenCalled())
+    const blob = createObjectUrl.mock.calls[0][0] as Blob
+    const debugExport = JSON.parse(await blob.text())
+    const clickedAnchor = clickAnchor.mock.instances[0] as HTMLAnchorElement
+
+    expect(blob.type).toBe('application/json')
+    expect(debugExport).toMatchObject({
+      schemaVersion: 1,
+      localStorage: {
+        employees: [expect.objectContaining({ id: 'debug-emp' })],
+      },
+      indexedDB: {
+        scheduleMonths: ['2026-05'],
+        monthlySchedules: [expect.objectContaining({ month: '2026-05' })],
+      },
+    })
+    expect(clickedAnchor.download).toMatch(
+      /^work-schedule-debug-\d{4}-\d{2}-\d{2}\.json$/,
+    )
+    expect(clickedAnchor.href).toBe('blob:debug-export')
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:debug-export')
+  })
 })
 
 async function generateVisibleSchedule(

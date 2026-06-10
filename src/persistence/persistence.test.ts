@@ -5,6 +5,7 @@ import type { Employee, MonthlySchedule } from '../domain/model'
 import {
   IndexedDbScheduleStore,
   LocalStorageSettingsStore,
+  buildStorageDebugExport,
   defaultRuleSettings,
 } from './persistence'
 
@@ -87,6 +88,54 @@ describe('persistence adapters', () => {
 
     expect(await store.loadSchedule('2026-06')).toBeNull()
     expect(await store.listScheduleMonths()).toEqual(['2026-07'])
+  })
+
+  it('builds a debug export from localStorage settings and IndexedDB schedules', async () => {
+    const settingsStore = new LocalStorageSettingsStore(localStorage)
+    const scheduleStore = new IndexedDbScheduleStore({
+      databaseName,
+      indexedDB: fakeIndexedDB,
+    })
+    const employees: Employee[] = [
+      {
+        id: 'emp-1',
+        name: '屈澤宇',
+        isSupervisor: true,
+        isVeteran: true,
+        isPT: false,
+        isActive: true,
+        prevMonthLastShift: '國A',
+      },
+    ]
+    const ruleSettings = defaultRuleSettings().map((setting) =>
+      setting.ruleId === 'R15' ? { ...setting, isEnabled: false } : setting,
+    )
+    const juneSchedule = makeSchedule('2026-06')
+    const julySchedule = makeSchedule('2026-07')
+
+    settingsStore.saveEmployees(employees)
+    settingsStore.saveRuleSettings(ruleSettings)
+    await scheduleStore.saveSchedule(julySchedule)
+    await scheduleStore.saveSchedule(juneSchedule)
+
+    await expect(
+      buildStorageDebugExport({
+        exportedAt: '2026-06-10T00:00:00.000Z',
+        scheduleStore,
+        settingsStore,
+      }),
+    ).resolves.toEqual({
+      schemaVersion: 1,
+      exportedAt: '2026-06-10T00:00:00.000Z',
+      localStorage: {
+        employees,
+        ruleSettings,
+      },
+      indexedDB: {
+        scheduleMonths: ['2026-06', '2026-07'],
+        monthlySchedules: [juneSchedule, julySchedule],
+      },
+    })
   })
 })
 

@@ -17,6 +17,25 @@ interface IndexedDbScheduleStoreOptions {
   indexedDB?: IDBFactory
 }
 
+export interface StorageDebugExport {
+  schemaVersion: 1
+  exportedAt: string
+  localStorage: {
+    employees: Employee[]
+    ruleSettings: RuleSetting[]
+  }
+  indexedDB: {
+    scheduleMonths: MonthString[]
+    monthlySchedules: MonthlySchedule[]
+  }
+}
+
+interface StorageDebugExportOptions {
+  exportedAt?: string
+  scheduleStore: IndexedDbScheduleStore
+  settingsStore: LocalStorageSettingsStore
+}
+
 const DEFAULT_LOCAL_STORAGE_KEYS: LocalStorageKeys = {
   employees: 'work-schedule:employees',
   ruleSettings: 'work-schedule:rule-settings',
@@ -155,6 +174,33 @@ export class IndexedDbScheduleStore {
         closeAndReject(error)
       }
     })
+  }
+}
+
+export async function buildStorageDebugExport({
+  exportedAt = new Date().toISOString(),
+  scheduleStore,
+  settingsStore,
+}: StorageDebugExportOptions): Promise<StorageDebugExport> {
+  const scheduleMonths = await scheduleStore.listScheduleMonths()
+  const loadedSchedules = await Promise.all(
+    scheduleMonths.map((month) => scheduleStore.loadSchedule(month)),
+  )
+  const monthlySchedules = loadedSchedules.filter(
+    (schedule): schedule is MonthlySchedule => schedule !== null,
+  )
+
+  return {
+    schemaVersion: 1,
+    exportedAt,
+    localStorage: {
+      employees: settingsStore.loadEmployees(),
+      ruleSettings: settingsStore.loadRuleSettings(),
+    },
+    indexedDB: {
+      scheduleMonths,
+      monthlySchedules,
+    },
   }
 }
 

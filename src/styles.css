@@ -83,6 +83,14 @@ h2 {
   gap: 8px;
 }
 
+.topActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .tab {
   min-height: 40px;
   padding: 0 14px;
@@ -96,6 +104,16 @@ h2 {
   color: #17302b;
   background: #f1c76d;
   border-color: #f1c76d;
+}
+
+.debugExportButton {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgb(255 255 255 / 34%);
+  border-radius: 8px;
+  color: #17302b;
+  background: #dbeafe;
+  font-weight: 700;
 }
 
 .workspace {

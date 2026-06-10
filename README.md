@@ -61,6 +61,18 @@ npm run build
 npm run verify
 ```
 
+## GitHub Pages 部署
+
+本專案已加入 GitHub Actions workflow，push 到 `master` 後會建置並部署到 GitHub Pages：
+
+```text
+https://wayne5540.github.io/worksheet-scheduler/
+```
+
+Vite build 會在部署 workflow 中使用 `--base=/worksheet-scheduler/`，避免 GitHub Pages 專案網站的靜態資源路徑 404。
+
+若第一次部署沒有自動發布，請到 GitHub repo 的 Settings > Pages，將 Build and deployment 的 Source 設為 `GitHub Actions`，再重新執行 `Deploy GitHub Pages` workflow。
+
 ## 資料重置
 
 本 app 會使用瀏覽器的 `localStorage` 與 IndexedDB 保存資料。若要清掉本機測試資料，可以在瀏覽器 DevTools 的 Application 面板中清除目前網站的 Storage，或直接清除該 localhost 網站資料。

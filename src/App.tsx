@@ -29,6 +29,7 @@ import {
   createScheduleWorkbookBlob,
 } from './export/excel'
 import {
+  buildStorageDebugExport,
   defaultRuleSettings,
   IndexedDbScheduleStore,
   LocalStorageSettingsStore,
@@ -337,6 +338,23 @@ function App() {
     ])
   }
 
+  async function exportDebugStorage() {
+    const exportedAt = new Date().toISOString()
+    const debugExport = await buildStorageDebugExport({
+      exportedAt,
+      scheduleStore,
+      settingsStore,
+    })
+    const blob = new Blob([JSON.stringify(debugExport, null, 2)], {
+      type: 'application/json',
+    })
+
+    downloadBlob(
+      blob,
+      `work-schedule-debug-${exportedAt.slice(0, 10)}.json`,
+    )
+  }
+
   function moveEmployee(employeeId: string, direction: -1 | 1) {
     setEmployees((currentEmployees) =>
       moveEmployeeById(currentEmployees, employeeId, direction),
@@ -437,20 +455,29 @@ function App() {
           <h1>門市排班系統</h1>
         </div>
 
-        <nav aria-label="主要頁面" className="tabs" role="tablist">
-          {navItems.map((item) => (
-            <button
-              aria-selected={item === activeTab}
-              className="tab"
-              key={item}
-              onClick={() => setActiveTab(item)}
-              role="tab"
-              type="button"
-            >
-              {item}
-            </button>
-          ))}
-        </nav>
+        <div className="topActions">
+          <nav aria-label="主要頁面" className="tabs" role="tablist">
+            {navItems.map((item) => (
+              <button
+                aria-selected={item === activeTab}
+                className="tab"
+                key={item}
+                onClick={() => setActiveTab(item)}
+                role="tab"
+                type="button"
+              >
+                {item}
+              </button>
+            ))}
+          </nav>
+          <button
+            className="debugExportButton"
+            onClick={() => void exportDebugStorage()}
+            type="button"
+          >
+            匯出 Debug JSON
+          </button>
+        </div>
       </header>
 
       {activeTab === '員工管理' && (
