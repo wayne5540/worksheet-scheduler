@@ -29,10 +29,11 @@ Last updated: 2026-06-10
 - [x] Improved Excel export styling and template-like layout metadata.
 - [x] Added rule descriptions, relaxed-rule reporting, and a functional regenerate action in the UI.
 - [x] Automated previous-month last-shift carry-forward from saved schedules.
+- [x] Added Step 5 special-day, date, and weekday header rows.
 
 ## In Progress
 
-- None.
+- [ ] Add preflight generation errors for impossible staffing inputs.
 
 ## Todo
 
@@ -67,3 +68,4 @@ Last updated: 2026-06-10
 - Excel export now emits a merged title row, frozen top rows/left columns, explicit column widths, landscape orientation, hidden gridlines, and styled cells; no source `.xlsx` template is currently present in the repository for pixel-level comparison.
 - Rule descriptions now live on `RuleDefinition`, and Step 5 surfaces relaxed rules from saved schedules while `重新產生` reruns scheduling and overwrites manual edits.
 - Previous-month last shifts are loaded from the saved schedule's final date into matching employee records, including holiday shift types such as `國A`.
+- Step 5 review table now mirrors the PLAN header structure with special-day markers, date numbers, and weekday labels above the editable schedule cells.

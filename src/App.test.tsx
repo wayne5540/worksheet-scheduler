@@ -68,6 +68,12 @@ describe('App', () => {
     expect(
       within(scheduleTable).getByRole('columnheader', { name: '30' }),
     ).toBeInTheDocument()
+    expect(
+      within(scheduleTable).getByRole('columnheader', { name: '假日' }),
+    ).toBeInTheDocument()
+    expect(
+      within(scheduleTable).getAllByRole('columnheader', { name: '二' }).length,
+    ).toBeGreaterThan(0)
     expect(screen.getByText('F05 班人數')).toBeInTheDocument()
     expect(screen.getByText('F13 班人數')).toBeInTheDocument()
     expect(screen.getByText('A 班人數')).toBeInTheDocument()

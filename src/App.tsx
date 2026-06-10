@@ -50,6 +50,7 @@ const stepTitles = [
   '產生班表',
   '檢視 / 調整 / 匯出',
 ] as const
+const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'] as const
 
 const DEFAULT_EMPLOYEES: Employee[] = [
   {
@@ -1210,11 +1211,29 @@ function StepFive({
           <caption>班表檢視</caption>
           <thead>
             <tr>
-              <th scope="col">員工</th>
-              <th scope="col">前一個月</th>
+              <th rowSpan={3} scope="col">
+                員工
+              </th>
+              <th rowSpan={3} scope="col">
+                前一個月
+              </th>
+              {visibleDates.map((date) => (
+                <th className="scheduleMarkerHeader" key={date} scope="col">
+                  {scheduleSpecialDayLabel(schedule, date)}
+                </th>
+              ))}
+            </tr>
+            <tr>
               {visibleDates.map((date) => (
                 <th key={date} scope="col">
                   {Number(date.slice(-2))}
+                </th>
+              ))}
+            </tr>
+            <tr>
+              {visibleDates.map((date) => (
+                <th key={date} scope="col">
+                  {weekdayLabel(date)}
                 </th>
               ))}
             </tr>
@@ -1453,6 +1472,20 @@ function hasScheduleSpecialDay(
   return schedule.specialDays.some(
     (specialDay) => specialDay.date === date && specialDay.type === type,
   )
+}
+
+function scheduleSpecialDayLabel(
+  schedule: MonthlySchedule,
+  date: DateString,
+): string {
+  return schedule.specialDays
+    .filter((specialDay) => specialDay.date === date)
+    .map((specialDay) => specialDay.type)
+    .join(' / ')
+}
+
+function weekdayLabel(date: DateString): (typeof WEEKDAY_LABELS)[number] {
+  return WEEKDAY_LABELS[parseDate(date).getUTCDay()]
 }
 
 function isScheduleWorkShift(shift: ShiftType | undefined): boolean {
