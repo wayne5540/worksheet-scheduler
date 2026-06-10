@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import {
+  applyPreviousMonthLastShifts,
   calculateCycleCarryInFromSchedule,
   previousMonth,
 } from './domain/cycleCarryIn'
@@ -80,15 +81,7 @@ const DEFAULT_EMPLOYEES: Employee[] = [
   },
 ]
 
-const PREV_MONTH_SHIFT_OPTIONS: (ShiftType | '')[] = [
-  '',
-  'F05',
-  'F13',
-  'A',
-  '休',
-  '例',
-  '國',
-]
+const PREV_MONTH_SHIFT_OPTIONS: (ShiftType | '')[] = ['', ...SHIFT_TYPES]
 
 function App() {
   const settingsStore = useMemo(
@@ -186,6 +179,26 @@ function App() {
         setGenerationMessage('已載入已儲存班表')
       }
     })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [month, scheduleStore])
+
+  useEffect(() => {
+    let isCurrent = true
+
+    scheduleStore
+      .loadSchedule(previousMonth(month))
+      .then((previousSchedule) => {
+        if (!isCurrent || !previousSchedule) {
+          return
+        }
+
+        setEmployees((currentEmployees) =>
+          applyPreviousMonthLastShifts(currentEmployees, previousSchedule),
+        )
+      })
 
     return () => {
       isCurrent = false

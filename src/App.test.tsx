@@ -257,6 +257,29 @@ describe('App', () => {
     expect(screen.getByLabelText('一般員工 上月休假結轉')).toHaveValue(0)
   })
 
+  it('loads previous-month last shifts from a saved schedule into employees', async () => {
+    const user = userEvent.setup()
+    const store = new IndexedDbScheduleStore()
+
+    await store.saveSchedule({
+      ...makePreviousMonthSchedule(),
+      entries: [
+        makeEntry('emp-supervisor', '2026-05-31', 'F13'),
+        makeEntry('emp-veteran', '2026-05-31', '國A'),
+        makeEntry('emp-regular', '2026-05-31', '例'),
+      ],
+    })
+
+    render(<App />)
+    await user.click(screen.getByRole('tab', { name: '員工管理' }))
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('員工 1 前月末班')).toHaveValue('F13'),
+    )
+    expect(screen.getByLabelText('員工 2 前月末班')).toHaveValue('國A')
+    expect(screen.getByLabelText('員工 3 前月末班')).toHaveValue('例')
+  })
+
   it('persists manual schedule cell edits in IndexedDB', async () => {
     const user = userEvent.setup()
     const { unmount } = render(<App />)

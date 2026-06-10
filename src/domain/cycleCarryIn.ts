@@ -47,11 +47,40 @@ export function calculateCycleCarryInFromSchedule({
   })
 }
 
+export function applyPreviousMonthLastShifts(
+  employees: Employee[],
+  previousSchedule: MonthlySchedule,
+): Employee[] {
+  const lastDate = lastDateOfMonth(previousSchedule.month)
+  const lastShiftByEmployeeId = new Map(
+    previousSchedule.entries
+      .filter((entry) => entry.date === lastDate)
+      .map((entry) => [entry.employeeId, entry.shift]),
+  )
+
+  return employees.map((employee) => {
+    const lastShift = lastShiftByEmployeeId.get(employee.id)
+
+    return lastShift === undefined
+      ? employee
+      : { ...employee, prevMonthLastShift: lastShift }
+  })
+}
+
 export function previousMonth(month: MonthString): MonthString {
   const [year, monthNumber] = parseYearMonth(month)
   const date = new Date(Date.UTC(year, monthNumber - 2, 1))
 
   return formatMonth(date)
+}
+
+function lastDateOfMonth(month: MonthString): DateString {
+  const monthStart = parseMonthStart(month)
+  const monthEnd = new Date(
+    Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0),
+  )
+
+  return formatDate(monthEnd)
 }
 
 function zeroCarryIn(employees: Employee[]): CycleCarryIn[] {
@@ -109,4 +138,12 @@ function formatMonth(date: Date): MonthString {
   const month = String(date.getUTCMonth() + 1).padStart(2, '0')
 
   return `${year}-${month}` as MonthString
+}
+
+function formatDate(date: Date): DateString {
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}` as DateString
 }

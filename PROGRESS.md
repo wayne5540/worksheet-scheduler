@@ -28,10 +28,11 @@ Last updated: 2026-06-10
 - [x] Computed Step 1 carry-in automatically from saved previous-month schedules when available.
 - [x] Improved Excel export styling and template-like layout metadata.
 - [x] Added rule descriptions, relaxed-rule reporting, and a functional regenerate action in the UI.
+- [x] Automated previous-month last-shift carry-forward from saved schedules.
 
 ## In Progress
 
-- [ ] Automate previous-month last-shift carry-forward from saved schedules.
+- None.
 
 ## Todo
 
@@ -65,3 +66,4 @@ Last updated: 2026-06-10
 - Step 1 carry-in automation reads the saved previous-month schedule from IndexedDB and counts only `例`/`休` entries from `prevFourWeekDate + 1` through the previous month end; manual rows remain the fallback when no prior schedule exists.
 - Excel export now emits a merged title row, frozen top rows/left columns, explicit column widths, landscape orientation, hidden gridlines, and styled cells; no source `.xlsx` template is currently present in the repository for pixel-level comparison.
 - Rule descriptions now live on `RuleDefinition`, and Step 5 surfaces relaxed rules from saved schedules while `重新產生` reruns scheduling and overwrites manual edits.
+- Previous-month last shifts are loaded from the saved schedule's final date into matching employee records, including holiday shift types such as `國A`.

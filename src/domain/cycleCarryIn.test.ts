@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Employee, MonthlySchedule } from './model'
 import {
+  applyPreviousMonthLastShifts,
   calculateCycleCarryInFromSchedule,
   previousMonth,
 } from './cycleCarryIn'
@@ -82,6 +83,23 @@ describe('cycle carry-in calculation', () => {
   it('formats the previous month across year boundaries', () => {
     expect(previousMonth('2026-01')).toBe('2025-12')
     expect(previousMonth('2026-06')).toBe('2026-05')
+  })
+
+  it('applies last-day shifts from the previous-month schedule to matching employees', () => {
+    expect(
+      applyPreviousMonthLastShifts(employees, {
+        ...makePreviousSchedule(),
+        entries: [
+          makeEntry('emp-1', '2026-05-30', '休'),
+          makeEntry('emp-1', '2026-05-31', 'F13'),
+          makeEntry('emp-2', '2026-05-31', '國A'),
+        ],
+      }),
+    ).toEqual([
+      expect.objectContaining({ id: 'emp-1', prevMonthLastShift: 'F13' }),
+      expect.objectContaining({ id: 'emp-2', prevMonthLastShift: '國A' }),
+      expect.objectContaining({ id: 'emp-new', prevMonthLastShift: null }),
+    ])
   })
 })
 
