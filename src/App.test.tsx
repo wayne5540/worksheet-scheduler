@@ -343,6 +343,20 @@ describe('App', () => {
     ).toBeInTheDocument()
   })
 
+  it('shows a loading state while generating a schedule', async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await goToGenerateStep(user)
+    const generateButton = screen.getByRole('button', { name: '產生班表' })
+    const clickGeneration = user.click(generateButton)
+
+    expect(await screen.findByRole('status')).toHaveTextContent('產生中')
+    expect(generateButton).toBeDisabled()
+    await clickGeneration
+  })
+
   it('persists manual schedule cell edits in IndexedDB', async () => {
     const user = userEvent.setup()
     const { unmount } = render(<App />)

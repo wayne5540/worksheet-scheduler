@@ -157,6 +157,7 @@ function App() {
   const [generationMessage, setGenerationMessage] = useState<string | null>(
     null,
   )
+  const [isGenerating, setIsGenerating] = useState(false)
   const carryInSourceKey = useRef<string | null>(null)
 
   const fourWeekNodes = useMemo(
@@ -339,40 +340,47 @@ function App() {
     })
 
     if (preflightError) {
+      setIsGenerating(false)
       setGenerationMessage(preflightError)
       setCurrentStep(4)
       return
     }
 
+    setIsGenerating(true)
     setGenerationMessage('產生中')
+    await yieldToRender()
 
-    const result = runRelaxedScheduling(
-      {
-        employees,
-        month,
-        prevFourWeekDate,
-        cycleCarryIn: normalizedCycleCarryIn,
-        specialDays,
-        constraints: monthConstraints,
-        lockedEntries: [],
-        rules: activeRules,
-      },
-      attemptBacktrackingSchedule,
-    )
-
-    if (result.success) {
-      await scheduleStore.saveSchedule(result.schedule)
-      setSchedule(result.schedule)
-      setGenerationMessage(
-        result.schedule.relaxedRules.length === 0
-          ? GENERATED_MESSAGE
-          : PARTIAL_RELAXED_MESSAGE,
+    try {
+      const result = runRelaxedScheduling(
+        {
+          employees,
+          month,
+          prevFourWeekDate,
+          cycleCarryIn: normalizedCycleCarryIn,
+          specialDays,
+          constraints: monthConstraints,
+          lockedEntries: [],
+          rules: activeRules,
+        },
+        attemptBacktrackingSchedule,
       )
-      setCurrentStep(result.schedule.relaxedRules.length === 0 ? 5 : 4)
-      return
-    }
 
-    setGenerationMessage(result.reason)
+      if (result.success) {
+        await scheduleStore.saveSchedule(result.schedule)
+        setSchedule(result.schedule)
+        setGenerationMessage(
+          result.schedule.relaxedRules.length === 0
+            ? GENERATED_MESSAGE
+            : PARTIAL_RELAXED_MESSAGE,
+        )
+        setCurrentStep(result.schedule.relaxedRules.length === 0 ? 5 : 4)
+        return
+      }
+
+      setGenerationMessage(result.reason)
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   return (
@@ -456,6 +464,7 @@ function App() {
           employees={employees}
           fourWeekNodes={fourWeekNodes}
           generationMessage={generationMessage}
+          isGenerating={isGenerating}
           manualSpecialDays={manualSpecialDays}
           month={month}
           onGenerate={generateSchedule}
@@ -749,6 +758,7 @@ interface MonthlyWorkspaceProps {
   employees: Employee[]
   fourWeekNodes: DateString[]
   generationMessage: string | null
+  isGenerating: boolean
   manualSpecialDays: SpecialDay[]
   month: MonthString
   onGenerate: () => void | Promise<void>
@@ -773,6 +783,7 @@ function MonthlyWorkspace({
   employees,
   fourWeekNodes,
   generationMessage,
+  isGenerating,
   manualSpecialDays,
   month,
   onGenerate,
@@ -840,6 +851,7 @@ function MonthlyWorkspace({
         {currentStep === 4 && (
           <StepFour
             generationMessage={generationMessage}
+            isGenerating={isGenerating}
             onGenerate={onGenerate}
             onViewSchedule={() => onSetCurrentStep(5)}
             relaxedRules={
@@ -1139,21 +1151,33 @@ function StepThree({
 
 function StepFour({
   generationMessage,
+  isGenerating,
   onGenerate,
   onViewSchedule,
   relaxedRules,
 }: {
   generationMessage: string | null
+  isGenerating: boolean
   onGenerate: () => void | Promise<void>
   onViewSchedule: () => void
   relaxedRules: MonthlySchedule['relaxedRules']
 }) {
   return (
-    <div className="generatePanel">
-      <button onClick={() => void onGenerate()} type="button">
+    <div aria-busy={isGenerating} className="generatePanel">
+      <button
+        disabled={isGenerating}
+        onClick={() => void onGenerate()}
+        type="button"
+      >
         產生班表
       </button>
-      {generationMessage && <p>{generationMessage}</p>}
+      {isGenerating && (
+        <div className="loadingIndicator" role="status">
+          <span aria-hidden="true" className="spinner" />
+          產生中
+        </div>
+      )}
+      {!isGenerating && generationMessage && <p>{generationMessage}</p>}
       {relaxedRules.length > 0 && (
         <>
           <RelaxedRulesSummary relaxedRules={relaxedRules} />
@@ -1486,6 +1510,12 @@ function downloadBlob(blob: Blob, fileName: string) {
   link.click()
   link.remove()
   URL.revokeObjectURL(url)
+}
+
+function yieldToRender(): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, 0)
+  })
 }
 
 function entryFor(
