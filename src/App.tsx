@@ -328,9 +328,37 @@ function App() {
     )
   }
 
+  function reorderEmployee(employeeId: string, targetEmployeeId: string) {
+    setEmployees((currentEmployees) =>
+      moveItemBefore(
+        currentEmployees,
+        employeeId,
+        targetEmployeeId,
+        (employee) => employee.id,
+      ),
+    )
+  }
+
   function moveRuleSetting(ruleId: RuleSetting['ruleId'], direction: -1 | 1) {
     setRuleSettings((currentSettings) =>
       moveRuleSettingById(currentSettings, ruleId, direction),
+    )
+  }
+
+  function reorderRuleSetting(
+    ruleId: RuleSetting['ruleId'],
+    targetRuleId: RuleSetting['ruleId'],
+  ) {
+    setRuleSettings((currentSettings) =>
+      moveItemBefore(
+        [...currentSettings].sort((left, right) => left.priority - right.priority),
+        ruleId,
+        targetRuleId,
+        (setting) => setting.ruleId,
+      ).map((setting, index) => ({
+        ...setting,
+        priority: index + 1,
+      })),
     )
   }
 
@@ -433,6 +461,7 @@ function App() {
             )
           }
           onMoveEmployee={moveEmployee}
+          onReorderEmployee={reorderEmployee}
           onUpdateEmployee={(employeeId, patch) =>
             setEmployees((currentEmployees) =>
               currentEmployees.map((employee) =>
@@ -448,6 +477,7 @@ function App() {
         <RuleWorkspace
           onRestoreDefaults={() => setRuleSettings(defaultRuleSettings())}
           onMoveRuleSetting={moveRuleSetting}
+          onReorderRuleSetting={reorderRuleSetting}
           onUpdateRuleSetting={(ruleId, patch) =>
             setRuleSettings((currentSettings) =>
               currentSettings.map((setting) =>
@@ -495,14 +525,28 @@ function EmployeeWorkspace({
   onAddEmployee,
   onDeleteEmployee,
   onMoveEmployee,
+  onReorderEmployee,
   onUpdateEmployee,
 }: {
   employees: Employee[]
   onAddEmployee: () => void
   onDeleteEmployee: (employeeId: string) => void
   onMoveEmployee: (employeeId: string, direction: -1 | 1) => void
+  onReorderEmployee: (employeeId: string, targetEmployeeId: string) => void
   onUpdateEmployee: (employeeId: string, patch: Partial<Employee>) => void
 }) {
+  const [draggedEmployeeId, setDraggedEmployeeId] = useState<string | null>(
+    null,
+  )
+
+  function dropEmployee(targetEmployeeId: string) {
+    if (draggedEmployeeId && draggedEmployeeId !== targetEmployeeId) {
+      onReorderEmployee(draggedEmployeeId, targetEmployeeId)
+    }
+
+    setDraggedEmployeeId(null)
+  }
+
   return (
     <section aria-labelledby="employee-title" className="workspace">
       <WorkspaceTitle
@@ -615,6 +659,21 @@ function EmployeeWorkspace({
                 <td>
                   <div className="inlineActions">
                     <button
+                      aria-label={`員工 ${index + 1} 拖拉排序`}
+                      className="dragHandle"
+                      draggable
+                      onDragEnd={() => setDraggedEmployeeId(null)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDragStart={() => setDraggedEmployeeId(employee.id)}
+                      onDrop={(event) => {
+                        event.preventDefault()
+                        dropEmployee(employee.id)
+                      }}
+                      type="button"
+                    >
+                      ≡
+                    </button>
+                    <button
                       aria-label={`員工 ${index + 1} 上移`}
                       className="textButton"
                       disabled={index === 0}
@@ -658,11 +717,16 @@ function EmployeeWorkspace({
 
 function RuleWorkspace({
   onMoveRuleSetting,
+  onReorderRuleSetting,
   onRestoreDefaults,
   onUpdateRuleSetting,
   ruleSettings,
 }: {
   onMoveRuleSetting: (ruleId: RuleSetting['ruleId'], direction: -1 | 1) => void
+  onReorderRuleSetting: (
+    ruleId: RuleSetting['ruleId'],
+    targetRuleId: RuleSetting['ruleId'],
+  ) => void
   onRestoreDefaults: () => void
   onUpdateRuleSetting: (
     ruleId: RuleSetting['ruleId'],
@@ -670,6 +734,8 @@ function RuleWorkspace({
   ) => void
   ruleSettings: RuleSetting[]
 }) {
+  const [draggedRuleId, setDraggedRuleId] =
+    useState<RuleSetting['ruleId'] | null>(null)
   const settingsByRuleId = new Map(
     ruleSettings.map((setting) => [setting.ruleId, setting]),
   )
@@ -678,6 +744,14 @@ function RuleWorkspace({
     priority: settingsByRuleId.get(rule.id)?.priority ?? rule.priority,
     isEnabled: settingsByRuleId.get(rule.id)?.isEnabled ?? true,
   })).sort((left, right) => left.priority - right.priority)
+
+  function dropRule(targetRuleId: RuleSetting['ruleId']) {
+    if (draggedRuleId && draggedRuleId !== targetRuleId) {
+      onReorderRuleSetting(draggedRuleId, targetRuleId)
+    }
+
+    setDraggedRuleId(null)
+  }
 
   return (
     <section aria-labelledby="rule-title" className="workspace">
@@ -714,6 +788,21 @@ function RuleWorkspace({
                 </td>
                 <td>
                   <div className="inlineActions">
+                    <button
+                      aria-label={`${rule.id} 拖拉排序`}
+                      className="dragHandle"
+                      draggable
+                      onDragEnd={() => setDraggedRuleId(null)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDragStart={() => setDraggedRuleId(rule.id)}
+                      onDrop={(event) => {
+                        event.preventDefault()
+                        dropRule(rule.id)
+                      }}
+                      type="button"
+                    >
+                      ≡
+                    </button>
                     <button
                       aria-label={`${rule.id} 上移`}
                       className="textButton"
@@ -1810,6 +1899,34 @@ function moveRuleSettingById(
     ...setting,
     priority: index + 1,
   }))
+}
+
+function moveItemBefore<T, K>(
+  items: T[],
+  itemKey: K,
+  targetKey: K,
+  keyFor: (item: T) => K,
+): T[] {
+  if (itemKey === targetKey) {
+    return items
+  }
+
+  const currentIndex = items.findIndex((item) => keyFor(item) === itemKey)
+  const targetIndex = items.findIndex((item) => keyFor(item) === targetKey)
+
+  if (currentIndex < 0 || targetIndex < 0) {
+    return items
+  }
+
+  const reorderedItems = [...items]
+  const [movedItem] = reorderedItems.splice(currentIndex, 1)
+  const insertionIndex = reorderedItems.findIndex(
+    (item) => keyFor(item) === targetKey,
+  )
+
+  reorderedItems.splice(insertionIndex, 0, movedItem)
+
+  return reorderedItems
 }
 
 function requiresCarryIn(

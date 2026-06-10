@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -182,6 +182,33 @@ describe('App', () => {
 
     await user.click(screen.getByRole('tab', { name: '規則設定' }))
     await user.click(screen.getByRole('button', { name: 'R02 上移' }))
+
+    expect(
+      JSON.parse(localStorage.getItem('work-schedule:rule-settings') ?? '[]'),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ ruleId: 'R02', priority: 1 }),
+        expect.objectContaining({ ruleId: 'R01', priority: 2 }),
+      ]),
+    )
+  })
+
+  it('reorders employees and rules with drag handles', async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await user.click(screen.getByRole('tab', { name: '員工管理' }))
+    fireEvent.dragStart(screen.getByLabelText('員工 2 拖拉排序'))
+    fireEvent.dragOver(screen.getByLabelText('員工 1 拖拉排序'))
+    fireEvent.drop(screen.getByLabelText('員工 1 拖拉排序'))
+
+    expect(screen.getByLabelText('員工 1 姓名')).toHaveValue('老手')
+
+    await user.click(screen.getByRole('tab', { name: '規則設定' }))
+    fireEvent.dragStart(screen.getByLabelText('R02 拖拉排序'))
+    fireEvent.dragOver(screen.getByLabelText('R01 拖拉排序'))
+    fireEvent.drop(screen.getByLabelText('R01 拖拉排序'))
 
     expect(
       JSON.parse(localStorage.getItem('work-schedule:rule-settings') ?? '[]'),

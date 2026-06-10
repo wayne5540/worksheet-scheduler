@@ -193,6 +193,22 @@ button:disabled {
   gap: 6px;
 }
 
+.dragHandle {
+  min-width: 34px;
+  min-height: 30px;
+  border: 1px solid #cbd5cf;
+  border-radius: 6px;
+  padding: 0 8px;
+  color: #485653;
+  background: #ffffff;
+  cursor: grab;
+  font-weight: 800;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
 .inlineActions .textButton {
   min-height: 30px;
 }
