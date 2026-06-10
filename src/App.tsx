@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { calculateFourWeekNodes } from './domain/fourWeekCycle'
 import type {
@@ -8,12 +8,18 @@ import type {
   MonthlySchedule,
   PersonalConstraint,
   SpecialDay,
+  ShiftType,
 } from './domain/model'
 import { DEFAULT_RULES } from './domain/rules'
 import {
   buildScheduleWorkbook,
   createScheduleWorkbookBlob,
 } from './export/excel'
+import {
+  defaultRuleSettings,
+  LocalStorageSettingsStore,
+  type RuleSetting,
+} from './persistence/persistence'
 import {
   attemptBacktrackingSchedule,
   runRelaxedScheduling,
@@ -31,7 +37,7 @@ const stepTitles = [
   '檢視 / 調整 / 匯出',
 ] as const
 
-const employees: Employee[] = [
+const DEFAULT_EMPLOYEES: Employee[] = [
   {
     id: 'emp-supervisor',
     name: '主管',
@@ -61,9 +67,31 @@ const employees: Employee[] = [
   },
 ]
 
+const PREV_MONTH_SHIFT_OPTIONS: (ShiftType | '')[] = [
+  '',
+  'F05',
+  'F13',
+  'A',
+  '休',
+  '例',
+  '國',
+]
+
 function App() {
+  const settingsStore = useMemo(
+    () => new LocalStorageSettingsStore(window.localStorage),
+    [],
+  )
   const [activeTab, setActiveTab] = useState<NavItem>('月度排班')
   const [currentStep, setCurrentStep] = useState(1)
+  const [employees, setEmployees] = useState<Employee[]>(() => {
+    const storedEmployees = settingsStore.loadEmployees()
+
+    return storedEmployees.length > 0 ? storedEmployees : DEFAULT_EMPLOYEES
+  })
+  const [ruleSettings, setRuleSettings] = useState<RuleSetting[]>(() =>
+    settingsStore.loadRuleSettings(),
+  )
   const [month, setMonth] = useState<MonthString>('2026-06')
   const [prevFourWeekDate, setPrevFourWeekDate] =
     useState<DateString>('2026-05-15')
@@ -90,6 +118,35 @@ function App() {
     ],
     [fourWeekNodes, manualSpecialDays],
   )
+  const activeRules = useMemo(
+    () =>
+      ruleSettings
+        .filter((setting) => setting.isEnabled)
+        .map((setting) => {
+          const definition = DEFAULT_RULES.find(
+            (rule) => rule.id === setting.ruleId,
+          )
+
+          if (!definition) {
+            throw new Error(`Unknown rule setting: ${setting.ruleId}`)
+          }
+
+          return {
+            ...definition,
+            priority: setting.priority,
+          }
+        })
+        .sort((left, right) => left.priority - right.priority),
+    [ruleSettings],
+  )
+
+  useEffect(() => {
+    settingsStore.saveEmployees(employees)
+  }, [employees, settingsStore])
+
+  useEffect(() => {
+    settingsStore.saveRuleSettings(ruleSettings)
+  }, [ruleSettings, settingsStore])
 
   function generateSchedule() {
     const result = runRelaxedScheduling(
@@ -105,7 +162,7 @@ function App() {
         specialDays,
         constraints,
         lockedEntries: [],
-        rules: DEFAULT_RULES.filter((rule) => ['R01', 'R09'].includes(rule.id)),
+        rules: activeRules.filter((rule) => ['R01', 'R09'].includes(rule.id)),
       },
       attemptBacktrackingSchedule,
     )
@@ -148,12 +205,57 @@ function App() {
         </nav>
       </header>
 
-      {activeTab === '員工管理' && <EmployeeWorkspace employees={employees} />}
-      {activeTab === '規則設定' && <RuleWorkspace />}
+      {activeTab === '員工管理' && (
+        <EmployeeWorkspace
+          employees={employees}
+          onAddEmployee={() =>
+            setEmployees((currentEmployees) => [
+              ...currentEmployees,
+              {
+                id: `emp-${crypto.randomUUID()}`,
+                name: '新員工',
+                isSupervisor: false,
+                isVeteran: false,
+                isPT: false,
+                isActive: true,
+                prevMonthLastShift: null,
+              },
+            ])
+          }
+          onDeleteEmployee={(employeeId) =>
+            setEmployees((currentEmployees) =>
+              currentEmployees.filter((employee) => employee.id !== employeeId),
+            )
+          }
+          onUpdateEmployee={(employeeId, patch) =>
+            setEmployees((currentEmployees) =>
+              currentEmployees.map((employee) =>
+                employee.id === employeeId
+                  ? { ...employee, ...patch }
+                  : employee,
+              ),
+            )
+          }
+        />
+      )}
+      {activeTab === '規則設定' && (
+        <RuleWorkspace
+          onRestoreDefaults={() => setRuleSettings(defaultRuleSettings())}
+          onUpdateRuleSetting={(ruleId, patch) =>
+            setRuleSettings((currentSettings) =>
+              currentSettings.map((setting) =>
+                setting.ruleId === ruleId ? { ...setting, ...patch } : setting,
+              ),
+            )
+          }
+          ruleSettings={ruleSettings}
+        />
+      )}
       {activeTab === '月度排班' && (
         <MonthlyWorkspace
           constraints={constraints}
           currentStep={currentStep}
+          employees={employees}
           fourWeekNodes={fourWeekNodes}
           generationMessage={generationMessage}
           manualSpecialDays={manualSpecialDays}
@@ -173,7 +275,17 @@ function App() {
   )
 }
 
-function EmployeeWorkspace({ employees }: { employees: Employee[] }) {
+function EmployeeWorkspace({
+  employees,
+  onAddEmployee,
+  onDeleteEmployee,
+  onUpdateEmployee,
+}: {
+  employees: Employee[]
+  onAddEmployee: () => void
+  onDeleteEmployee: (employeeId: string) => void
+  onUpdateEmployee: (employeeId: string, patch: Partial<Employee>) => void
+}) {
   return (
     <section aria-labelledby="employee-title" className="workspace">
       <WorkspaceTitle
@@ -182,7 +294,9 @@ function EmployeeWorkspace({ employees }: { employees: Employee[] }) {
         titleId="employee-title"
       />
       <div className="toolbar">
-        <button type="button">新增員工</button>
+        <button onClick={onAddEmployee} type="button">
+          新增員工
+        </button>
       </div>
       <div className="scheduleFrame">
         <table>
@@ -199,16 +313,97 @@ function EmployeeWorkspace({ employees }: { employees: Employee[] }) {
             </tr>
           </thead>
           <tbody>
-            {employees.map((employee) => (
+            {employees.map((employee, index) => (
               <tr key={employee.id}>
-                <th scope="row">{employee.name}</th>
-                <td>{employee.isSupervisor ? '是' : '否'}</td>
-                <td>{employee.isVeteran ? '是' : '否'}</td>
-                <td>{employee.isPT ? '是' : '否'}</td>
-                <td>{employee.isActive ? '啟用' : '停用'}</td>
-                <td>{employee.prevMonthLastShift ?? '-'}</td>
+                <th scope="row">
+                  <input
+                    aria-label={`員工 ${index + 1} 姓名`}
+                    onChange={(event) =>
+                      onUpdateEmployee(employee.id, {
+                        name: event.currentTarget.value,
+                      })
+                    }
+                    value={employee.name}
+                  />
+                </th>
                 <td>
-                  <button className="textButton" type="button">
+                  <input
+                    aria-label={`員工 ${index + 1} 主管`}
+                    checked={employee.isSupervisor}
+                    onChange={(event) =>
+                      onUpdateEmployee(employee.id, {
+                        isSupervisor: event.currentTarget.checked,
+                      })
+                    }
+                    type="checkbox"
+                  />
+                </td>
+                <td>
+                  <input
+                    aria-label={`員工 ${index + 1} 老手`}
+                    checked={employee.isVeteran}
+                    onChange={(event) =>
+                      onUpdateEmployee(employee.id, {
+                        isVeteran: event.currentTarget.checked,
+                      })
+                    }
+                    type="checkbox"
+                  />
+                </td>
+                <td>
+                  <input
+                    aria-label={`員工 ${index + 1} PT`}
+                    checked={employee.isPT}
+                    onChange={(event) =>
+                      onUpdateEmployee(employee.id, {
+                        isPT: event.currentTarget.checked,
+                      })
+                    }
+                    type="checkbox"
+                  />
+                </td>
+                <td>
+                  <input
+                    aria-label={`員工 ${index + 1} 啟用`}
+                    checked={employee.isActive}
+                    onChange={(event) =>
+                      onUpdateEmployee(employee.id, {
+                        isActive: event.currentTarget.checked,
+                      })
+                    }
+                    type="checkbox"
+                  />
+                </td>
+                <td>
+                  <select
+                    aria-label={`員工 ${index + 1} 前月末班`}
+                    onChange={(event) =>
+                      onUpdateEmployee(employee.id, {
+                        prevMonthLastShift:
+                          event.currentTarget.value === ''
+                            ? null
+                            : (event.currentTarget.value as ShiftType),
+                      })
+                    }
+                    value={employee.prevMonthLastShift ?? ''}
+                  >
+                    {PREV_MONTH_SHIFT_OPTIONS.map((shift) => (
+                      <option key={shift || 'none'} value={shift}>
+                        {shift || '-'}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td>
+                  <button
+                    className="textButton"
+                    onClick={() => {
+                      if (window.confirm(`確定刪除 ${employee.name}？`)) {
+                        onDeleteEmployee(employee.id)
+                      }
+                    }}
+                    type="button"
+                  >
                     刪除
                   </button>
                 </td>
@@ -221,12 +416,34 @@ function EmployeeWorkspace({ employees }: { employees: Employee[] }) {
   )
 }
 
-function RuleWorkspace() {
+function RuleWorkspace({
+  onRestoreDefaults,
+  onUpdateRuleSetting,
+  ruleSettings,
+}: {
+  onRestoreDefaults: () => void
+  onUpdateRuleSetting: (
+    ruleId: RuleSetting['ruleId'],
+    patch: Partial<RuleSetting>,
+  ) => void
+  ruleSettings: RuleSetting[]
+}) {
+  const settingsByRuleId = new Map(
+    ruleSettings.map((setting) => [setting.ruleId, setting]),
+  )
+  const rules = DEFAULT_RULES.map((rule) => ({
+    ...rule,
+    priority: settingsByRuleId.get(rule.id)?.priority ?? rule.priority,
+    isEnabled: settingsByRuleId.get(rule.id)?.isEnabled ?? true,
+  })).sort((left, right) => left.priority - right.priority)
+
   return (
     <section aria-labelledby="rule-title" className="workspace">
       <WorkspaceTitle eyebrow="Rules" title="規則設定" titleId="rule-title" />
       <div className="toolbar">
-        <button type="button">還原預設順序</button>
+        <button onClick={onRestoreDefaults} type="button">
+          還原預設順序
+        </button>
       </div>
       <div className="scheduleFrame">
         <table>
@@ -240,12 +457,23 @@ function RuleWorkspace() {
             </tr>
           </thead>
           <tbody>
-            {DEFAULT_RULES.map((rule) => (
+            {rules.map((rule) => (
               <tr key={rule.id}>
                 <td>{rule.priority}</td>
                 <th scope="row">{rule.id}</th>
                 <td>{rule.name}</td>
-                <td>啟用</td>
+                <td>
+                  <input
+                    aria-label={`${rule.id} 啟用`}
+                    checked={rule.isEnabled}
+                    onChange={(event) =>
+                      onUpdateRuleSetting(rule.id, {
+                        isEnabled: event.currentTarget.checked,
+                      })
+                    }
+                    type="checkbox"
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -258,6 +486,7 @@ function RuleWorkspace() {
 interface MonthlyWorkspaceProps {
   constraints: PersonalConstraint[]
   currentStep: number
+  employees: Employee[]
   fourWeekNodes: DateString[]
   generationMessage: string | null
   manualSpecialDays: SpecialDay[]
@@ -276,6 +505,7 @@ interface MonthlyWorkspaceProps {
 function MonthlyWorkspace({
   constraints,
   currentStep,
+  employees,
   fourWeekNodes,
   generationMessage,
   manualSpecialDays,
@@ -331,6 +561,7 @@ function MonthlyWorkspace({
         {currentStep === 3 && (
           <StepThree
             constraints={constraints}
+            employees={employees}
             onSetConstraints={onSetConstraints}
           />
         )}
@@ -340,7 +571,9 @@ function MonthlyWorkspace({
             onGenerate={onGenerate}
           />
         )}
-        {currentStep === 5 && schedule && <StepFive schedule={schedule} />}
+        {currentStep === 5 && schedule && (
+          <StepFive employees={employees} schedule={schedule} />
+        )}
       </div>
 
       <div className="stepActions">
@@ -452,13 +685,15 @@ function StepTwo({
 
 function StepThree({
   constraints,
+  employees,
   onSetConstraints,
 }: {
   constraints: PersonalConstraint[]
+  employees: Employee[]
   onSetConstraints: (constraints: PersonalConstraint[]) => void
 }) {
   const date = '2026-06-03' as DateString
-  const employee = employees[0]
+  const employee = employees[0] ?? DEFAULT_EMPLOYEES[0]
   const isForced = constraints.some(
     (constraint) =>
       constraint.employeeId === employee.id &&
@@ -508,7 +743,13 @@ function StepFour({
   )
 }
 
-function StepFive({ schedule }: { schedule: MonthlySchedule }) {
+function StepFive({
+  employees,
+  schedule,
+}: {
+  employees: Employee[]
+  schedule: MonthlySchedule
+}) {
   const visibleDates = datesInMonth(schedule.month).slice(0, 5)
 
   async function exportExcel() {

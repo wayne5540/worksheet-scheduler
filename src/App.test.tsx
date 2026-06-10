@@ -1,10 +1,14 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import App from './App'
 
 describe('App', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
   it('renders the monthly scheduling stepper with calculated four-week nodes', () => {
     render(<App />)
 
@@ -73,5 +77,60 @@ describe('App', () => {
       screen.getByRole('button', { name: '還原預設順序' }),
     ).toBeInTheDocument()
     expect(screen.getByText('R01')).toBeInTheDocument()
+  })
+
+  it('persists employee edits in localStorage', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<App />)
+
+    await user.click(screen.getByRole('tab', { name: '員工管理' }))
+    await user.click(screen.getByRole('button', { name: '新增員工' }))
+    await user.clear(screen.getByLabelText('員工 4 姓名'))
+    await user.type(screen.getByLabelText('員工 4 姓名'), '新同事')
+    await user.click(screen.getByLabelText('員工 4 主管'))
+
+    expect(
+      JSON.parse(localStorage.getItem('work-schedule:employees') ?? '[]'),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: '新同事',
+          isSupervisor: true,
+        }),
+      ]),
+    )
+
+    unmount()
+    render(<App />)
+    await user.click(screen.getByRole('tab', { name: '員工管理' }))
+
+    expect(screen.getByDisplayValue('新同事')).toBeInTheDocument()
+    expect(screen.getByLabelText('員工 4 主管')).toBeChecked()
+  })
+
+  it('persists rule enabled settings and restores defaults', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<App />)
+
+    await user.click(screen.getByRole('tab', { name: '規則設定' }))
+    await user.click(screen.getByLabelText('R15 啟用'))
+
+    expect(
+      JSON.parse(localStorage.getItem('work-schedule:rule-settings') ?? '[]'),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ ruleId: 'R15', isEnabled: false }),
+      ]),
+    )
+
+    unmount()
+    render(<App />)
+    await user.click(screen.getByRole('tab', { name: '規則設定' }))
+
+    expect(screen.getByLabelText('R15 啟用')).not.toBeChecked()
+
+    await user.click(screen.getByRole('button', { name: '還原預設順序' }))
+
+    expect(screen.getByLabelText('R15 啟用')).toBeChecked()
   })
 })
