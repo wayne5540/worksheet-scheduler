@@ -12,14 +12,14 @@ Last updated: 2026-06-10
 - [x] Added the initial React + TypeScript + Vite TDD toolchain.
 - [x] Scaffolded the first app shell without implementing business scheduling logic.
 - [x] Added domain model tests and pure domain utilities for employees, shift types, special days, and four-week cycle calculations.
+- [x] Added R01-R15 rule validator tests and pure validation functions for existing monthly schedules.
 
 ## In Progress
 
-- [ ] Add rule validator tests before implementing R01-R15.
+- [ ] Add IndexedDB/localStorage persistence tests before persistence implementation.
 
 ## Todo
 
-- [ ] Add IndexedDB/localStorage persistence tests before persistence implementation.
 - [ ] Add Excel export structure tests before export implementation.
 - [ ] Build the monthly scheduling UI workflow from `PLAN.md`.
 
@@ -34,3 +34,4 @@ Last updated: 2026-06-10
 - Four-week carry-in is required when `prevFourWeekDate + 1` is before the current month, because the cycle start date determines whether the first R02 audit period crosses month boundaries.
 - Pure date calculations use UTC `Date` values internally and expose `YYYY-MM-DD` strings at module boundaries to avoid local timezone drift in schedule rules.
 - Special day data allows holiday and four-week markers to overlap with store-meeting or deep-cleaning markers; only store-meeting and deep-cleaning are mutually exclusive.
+- Rule validators currently validate completed monthly schedules and report violations; they do not yet generate candidate schedules or perform relaxation/backtracking.
