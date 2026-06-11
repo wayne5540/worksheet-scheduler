@@ -7,6 +7,7 @@ Last updated: 2026-06-11
 - [x] Committed `PLAN.md` as the baseline product specification.
 - [x] Added shared AI collaboration rules in `AGENTS.md`.
 - [x] Added `CLAUDE.md` as a symlink to `AGENTS.md`.
+- [x] Added `GEMINI.md` as a symlink to `AGENTS.md`.
 - [x] Added `docs/DEVELOPMENT_WORKFLOW.md` for package, TDD, commit, progress, hook, and handoff rules.
 - [x] Added versioned git hooks for commit message, progress, symlink, and verification enforcement.
 - [x] Added the initial React + TypeScript + Vite TDD toolchain.
@@ -56,6 +57,7 @@ Last updated: 2026-06-11
 - `PLAN.md` recommends React or Vue; this workflow selects React + TypeScript + Vite because it is a stable, common SPA stack with straightforward testing support.
 - Git hooks are stored in `.githooks` and require `git config core.hooksPath .githooks` after they are committed.
 - `pre-commit` intentionally requires `PROGRESS.md` in every commit to keep progress durable across multiple AI contributors.
+- `CLAUDE.md` and `GEMINI.md` are both symlinks to `AGENTS.md`; `scripts/verify-workflow.sh` enforces both targets so future agent-specific instruction files stay unified.
 - `@vitejs/plugin-react` peer dependencies for React Compiler support are optional in the current package metadata, so the setup uses the official Vite React plugin.
 - `PLAN.md` now explicitly includes `國A` because the rules convert holiday store-meeting late shifts from `國13` to `國A`; domain code should treat it as a holiday late/work shift.
 - Four-week carry-in is required when `prevFourWeekDate + 1` is before the current month, because the cycle start date determines whether the first R02 audit period crosses month boundaries.

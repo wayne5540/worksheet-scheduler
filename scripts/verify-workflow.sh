@@ -14,9 +14,11 @@ cd "$repo_root"
 [ -f PROGRESS.md ] || fail "PROGRESS.md is missing."
 [ -f docs/DEVELOPMENT_WORKFLOW.md ] || fail "docs/DEVELOPMENT_WORKFLOW.md is missing."
 
-[ -L CLAUDE.md ] || fail "CLAUDE.md must be a symlink to AGENTS.md."
-claude_target="$(readlink CLAUDE.md)"
-[ "$claude_target" = "AGENTS.md" ] || fail "CLAUDE.md must point to AGENTS.md, got: $claude_target"
+for collaboration_file in CLAUDE.md GEMINI.md; do
+  [ -L "$collaboration_file" ] || fail "$collaboration_file must be a symlink to AGENTS.md."
+  collaboration_target="$(readlink "$collaboration_file")"
+  [ "$collaboration_target" = "AGENTS.md" ] || fail "$collaboration_file must point to AGENTS.md, got: $collaboration_target"
+done
 
 for heading in "## Done" "## In Progress" "## Todo" "## Learnings"; do
   grep -q "^$heading$" PROGRESS.md || fail "PROGRESS.md is missing section: $heading"

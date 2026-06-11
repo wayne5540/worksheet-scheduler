@@ -7,7 +7,7 @@
 3. `docs/DEVELOPMENT_WORKFLOW.md`
 4. 最近的 git history：`git log --oneline --decorate -n 10`
 
-`CLAUDE.md` 是指向本檔的 symlink。請不要把 `CLAUDE.md` 改成獨立檔案；需要更新協作規則時，直接編輯 `AGENTS.md` 或透過 `CLAUDE.md` 編輯皆可。
+`CLAUDE.md` 與 `GEMINI.md` 都是指向本檔的 symlink。請不要把它們改成獨立檔案；需要更新協作規則時，直接編輯 `AGENTS.md`、`CLAUDE.md` 或 `GEMINI.md` 皆可。
 
 ## Project Direction
 

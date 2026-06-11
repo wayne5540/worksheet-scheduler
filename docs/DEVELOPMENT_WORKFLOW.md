@@ -6,7 +6,7 @@
 
 - `PLAN.md`：產品規格與需求範圍。
 - `PROGRESS.md`：目前已完成、正在做、尚未完成的 checklist。
-- `AGENTS.md` / `CLAUDE.md`：AI 協作規則。`CLAUDE.md` 必須是指向 `AGENTS.md` 的 symlink。
+- `AGENTS.md` / `CLAUDE.md` / `GEMINI.md`：AI 協作規則。`CLAUDE.md` 與 `GEMINI.md` 必須是指向 `AGENTS.md` 的 symlink。
 - git commits：每個小改動的永久紀錄。
 
 ## Package Policy
@@ -85,7 +85,7 @@ git config core.hooksPath .githooks
 
 hooks 的責任：
 
-- `pre-commit`：確認協作文件存在、`CLAUDE.md` symlink 正確、`PROGRESS.md` 已被納入 commit，並執行可用的驗證指令。
+- `pre-commit`：確認協作文件存在、`CLAUDE.md` / `GEMINI.md` symlink 正確、`PROGRESS.md` 已被納入 commit，並執行可用的驗證指令。
 - `commit-msg`：檢查 commit message 是否包含 title、Why、How、Goal、Result。
 - `pre-push`：執行完整驗證。
 
